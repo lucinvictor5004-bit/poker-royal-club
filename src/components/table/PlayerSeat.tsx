@@ -109,7 +109,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
               isActive ? 'border-amber-300' : 'border-stone-500'
             } flex items-center justify-center text-white font-bold text-[10px] md:text-xs shadow-inner`}
           >
-            {isHuman ? '★' : player.name.charAt(0)}
+            {player.name.charAt(0).toUpperCase()}
           </div>
 
           {/* Difficulty pill indicator on bot */}

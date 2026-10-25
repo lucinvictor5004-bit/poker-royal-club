@@ -84,3 +84,57 @@ test('ThreeCardPokerEngine: deals, handles fold, and calculates payouts', () => 
   assert.equal(engine.phase, 'ended');
   assert.equal(engine.playerChips, 930); // 70 lost
 });
+
+test('ThreeCardPokerEngine: multiplayer with friends at the same table', () => {
+  const engine = new ThreeCardPokerEngine({
+    players: [
+      { id: 'user_1', name: 'Алиса (Хост)', chips: 1000, isHost: true },
+      { id: 'user_2', name: 'Борис', chips: 1500, isHost: false },
+      { id: 'user_3', name: 'Виктор', chips: 2000, isHost: false },
+    ],
+    defaultAnte: 50,
+  });
+
+  assert.equal(engine.players.length, 3);
+  assert.equal(engine.phase, 'betting');
+
+  // Friends set their bets
+  assert.equal(engine.setBets(50, 25, 'user_1'), true);
+  assert.equal(engine.setBets(100, 0, 'user_2'), true);
+  assert.equal(engine.setBets(50, 10, 'user_3'), true);
+
+  // Host deals cards to all
+  assert.equal(engine.dealHand(), true);
+  assert.equal(engine.phase, 'decision');
+
+  // Verify all 3 players got 3 cards
+  assert.equal(engine.players[0].cards.length, 3);
+  assert.equal(engine.players[1].cards.length, 3);
+  assert.equal(engine.players[2].cards.length, 3);
+  assert.equal(engine.dealerCards.length, 3);
+
+  // User 1 folds, User 2 plays, User 3 plays
+  assert.equal(engine.playAction('fold', 'user_1'), true);
+  assert.equal(engine.phase, 'decision'); // still waiting for user 2 and 3
+
+  assert.equal(engine.playAction('play', 'user_2'), true);
+  assert.equal(engine.phase, 'decision'); // still waiting for user 3
+
+  assert.equal(engine.playAction('play', 'user_3'), true);
+  // All have decided -> phase transitions to ended & dealer is revealed
+  assert.equal(engine.phase, 'ended');
+  assert.equal(engine.dealerRevealed, true);
+  assert.ok(engine.dealerHand !== null);
+
+  // Verify User 1 lost ante & pair plus
+  assert.equal(engine.players[0].payoutSummary?.netProfit, -75);
+  assert.ok(engine.players[1].payoutSummary !== null);
+  assert.ok(engine.players[2].payoutSummary !== null);
+
+  // New round resets
+  engine.resetForNewRound();
+  assert.equal(engine.phase, 'betting');
+  assert.equal(engine.players[0].cards.length, 0);
+  assert.equal(engine.dealerCards.length, 0);
+});
+

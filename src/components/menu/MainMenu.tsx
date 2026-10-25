@@ -52,17 +52,19 @@ export const MainMenu: React.FC<MainMenuProps> = ({
         </div>
 
         {/* Top actions: Friends, Join by code, Settings */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 md:gap-2">
           <button
             type="button"
             onClick={() => {
               sounds.playButtonClick();
               onJoinByCode();
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#141518] hover:bg-[#1a1b22] text-stone-300 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#141518] hover:bg-[#1a1b22] text-stone-300 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer"
+            title="Войти по коду"
           >
             <KeyRound className="w-3.5 h-3.5 text-[#C5A880]" />
-            <span>Войти по коду</span>
+            <span className="hidden sm:inline">Войти по коду</span>
+            <span className="sm:hidden">Код</span>
           </button>
 
           <button
@@ -71,7 +73,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({
               sounds.playButtonClick();
               onOpenFriends();
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#141518] hover:bg-[#1a1b22] text-stone-300 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#141518] hover:bg-[#1a1b22] text-stone-300 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer"
+            title="Друзья"
           >
             <Users className="w-3.5 h-3.5 text-[#C5A880]" />
             <span>Друзья</span>
@@ -83,7 +86,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
               sounds.playButtonClick();
               onOpenSettings();
             }}
-            className="p-2 rounded-xl bg-[#141518] hover:bg-[#1a1b22] text-stone-400 hover:text-stone-200 border border-stone-800 transition-colors cursor-pointer"
+            className="p-1.5 md:p-2 rounded-xl bg-[#141518] hover:bg-[#1a1b22] text-stone-400 hover:text-stone-200 border border-stone-800 transition-colors cursor-pointer"
             aria-label="Настройки"
             title="Настройки"
           >

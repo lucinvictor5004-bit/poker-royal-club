@@ -116,6 +116,10 @@ export default function App() {
       if (event.type === 'PLAYER_JOINED' || event.type === 'PLAYERS_UPDATED') {
         if (event.payload?.players) {
           setRoomPlayers(event.payload.players);
+          if (threeCardEngineRef.current && activeRoom.mode === 'three_card') {
+            threeCardEngineRef.current.syncRoomPlayers(event.payload.players);
+            setThreeCardSnapshot(threeCardEngineRef.current.getSnapshot());
+          }
         }
       } else if (event.type === 'GAME_STARTED') {
         const updatedRoom = event.payload?.room || activeRoom;
@@ -124,6 +128,50 @@ export default function App() {
       } else if (event.type === 'PLAYER_LEFT') {
         if (event.payload?.players) {
           setRoomPlayers(event.payload.players);
+          if (threeCardEngineRef.current && activeRoom.mode === 'three_card') {
+            threeCardEngineRef.current.syncRoomPlayers(event.payload.players);
+            setThreeCardSnapshot(threeCardEngineRef.current.getSnapshot());
+          }
+        }
+      } else if (event.type === 'THREE_CARD_SYNC_STATE') {
+        if (event.payload?.snapshot && threeCardEngineRef.current) {
+          threeCardEngineRef.current.applySnapshot(event.payload.snapshot);
+          setThreeCardSnapshot(threeCardEngineRef.current.getSnapshot());
+        }
+      } else if (event.type === 'THREE_CARD_SET_BET') {
+        const isHost = activeRoom.hostId === currentPlayerId;
+        if (isHost && threeCardEngineRef.current) {
+          threeCardEngineRef.current.setBets(event.payload.ante, event.payload.pairPlus, event.payload.playerId);
+          const snap = threeCardEngineRef.current.getSnapshot();
+          setThreeCardSnapshot(snap);
+          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+        }
+      } else if (event.type === 'THREE_CARD_ACTION') {
+        const isHost = activeRoom.hostId === currentPlayerId;
+        if (isHost && threeCardEngineRef.current) {
+          threeCardEngineRef.current.playAction(event.payload.action, event.payload.playerId);
+          const snap = threeCardEngineRef.current.getSnapshot();
+          setThreeCardSnapshot(snap);
+          snap.players.forEach((p) => {
+            supabasePoker.updatePlayerChips(activeRoom.code, p.id, p.chips);
+          });
+          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+        }
+      } else if (event.type === 'THREE_CARD_DEAL') {
+        const isHost = activeRoom.hostId === currentPlayerId;
+        if (isHost && threeCardEngineRef.current) {
+          threeCardEngineRef.current.deal();
+          const snap = threeCardEngineRef.current.getSnapshot();
+          setThreeCardSnapshot(snap);
+          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+        }
+      } else if (event.type === 'THREE_CARD_NEW_ROUND') {
+        const isHost = activeRoom.hostId === currentPlayerId;
+        if (isHost && threeCardEngineRef.current) {
+          threeCardEngineRef.current.newRound();
+          const snap = threeCardEngineRef.current.getSnapshot();
+          setThreeCardSnapshot(snap);
+          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
         }
       }
     });
@@ -131,25 +179,38 @@ export default function App() {
     return () => {
       unsubscribe();
     };
-  }, [activeRoom?.code]);
+  }, [activeRoom?.code, activeRoom?.hostId, currentPlayerId]);
 
   // Initialize or launch game based on room mode
   const launchGameForMode = useCallback(
     (room: RoomRecord) => {
+      const playersList = supabasePoker.getRoomPlayers(room.code);
+      const effectivePlayers = playersList.length > 0 ? playersList : roomPlayers;
+      const isHost = room.hostId === currentPlayerId;
+
       if (room.mode === 'three_card') {
         const engine = new ThreeCardPokerEngine({
-          playerChips: room.startingChips,
+          players: effectivePlayers.map((p, idx) => ({
+            id: p.id,
+            name: p.name,
+            chips: p.chips,
+            isHost: p.isHost ?? idx === 0,
+            seatIndex: idx,
+          })),
+          startingChips: room.startingChips,
           defaultAnte: room.ante || 25,
         });
         threeCardEngineRef.current = engine;
-        setThreeCardSnapshot(engine.getSnapshot());
+        const snap = engine.getSnapshot();
+        setThreeCardSnapshot(snap);
         setView('game');
         setIsVictoryAnim(false);
+
+        if (isHost) {
+          supabasePoker.broadcastGameEvent(room.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+        }
       } else {
         // Texas Hold'em with real human room players (NO bots!)
-        const playersList = supabasePoker.getRoomPlayers(room.code);
-        const effectivePlayers = playersList.length > 0 ? playersList : roomPlayers;
-
         const players: Player[] = effectivePlayers.map((p, idx) => {
           return new Player({
             id: p.id,
@@ -186,7 +247,7 @@ export default function App() {
         setIsVictoryAnim(false);
       }
     },
-    [roomPlayers]
+    [roomPlayers, currentPlayerId]
   );
 
   // Host creates room
@@ -337,50 +398,99 @@ export default function App() {
   };
 
   // Three Card Poker Handlers
-  const handleThreeCardSetBets = (ante: number, pairPlus: number) => {
-    if (!threeCardEngineRef.current) return;
-    threeCardEngineRef.current.setBets(ante, pairPlus);
-    setThreeCardSnapshot(threeCardEngineRef.current.getSnapshot());
+  const handleThreeCardSetBets = (ante: number, pairPlus: number, playerId?: string) => {
+    const targetId = playerId || currentPlayerId;
+    const isHost = activeRoom?.hostId === currentPlayerId || !activeRoom;
+
+    if (isHost && threeCardEngineRef.current) {
+      threeCardEngineRef.current.setBets(ante, pairPlus, targetId);
+      const snap = threeCardEngineRef.current.getSnapshot();
+      setThreeCardSnapshot(snap);
+      if (activeRoom) {
+        supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+      }
+    } else if (activeRoom) {
+      supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SET_BET', {
+        playerId: targetId,
+        ante,
+        pairPlus,
+      });
+    }
   };
 
   const handleThreeCardDeal = () => {
-    if (!threeCardEngineRef.current) return;
-    threeCardEngineRef.current.deal();
-    setThreeCardSnapshot(threeCardEngineRef.current.getSnapshot());
+    const isHost = activeRoom?.hostId === currentPlayerId || !activeRoom;
+    if (isHost && threeCardEngineRef.current) {
+      threeCardEngineRef.current.deal();
+      const snap = threeCardEngineRef.current.getSnapshot();
+      setThreeCardSnapshot(snap);
+      if (activeRoom) {
+        supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+      }
+    } else if (activeRoom) {
+      supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_DEAL', {});
+    }
   };
 
-  const handleThreeCardAction = (action: 'play' | 'fold') => {
-    if (!threeCardEngineRef.current) return;
-    threeCardEngineRef.current.playerAction(action);
-    const snap = threeCardEngineRef.current.getSnapshot();
-    setThreeCardSnapshot(snap);
+  const handleThreeCardAction = (action: 'play' | 'fold', playerId?: string) => {
+    const targetId = playerId || currentPlayerId;
+    const isHost = activeRoom?.hostId === currentPlayerId || !activeRoom;
 
-    if (snap.payoutSummary && snap.payoutSummary.netProfit > 0) {
-      sounds.playWinFanfare();
-      setIsVictoryAnim(true);
+    if (isHost && threeCardEngineRef.current) {
+      threeCardEngineRef.current.playAction(action, targetId);
+      const snap = threeCardEngineRef.current.getSnapshot();
+      setThreeCardSnapshot(snap);
+
+      if (activeRoom) {
+        snap.players.forEach((p) => {
+          supabasePoker.updatePlayerChips(activeRoom.code, p.id, p.chips);
+        });
+        supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+      }
+
+      const myP = snap.players.find((p) => p.id === currentPlayerId);
+      if (myP?.payoutSummary && myP.payoutSummary.netProfit > 0) {
+        sounds.playWinFanfare();
+        setIsVictoryAnim(true);
+      }
+
+      // Record stats for local player
+      if (myP?.payoutSummary) {
+        setStats((prev) => {
+          const profit = myP.payoutSummary?.netProfit || 0;
+          const isWin = profit > 0;
+          const updated: PokerStats = {
+            gamesPlayed: prev.gamesPlayed + 1,
+            handsWon: isWin ? prev.handsWon + 1 : prev.handsWon,
+            largestPotWon: Math.max(prev.largestPotWon, myP.payoutSummary?.totalWon || 0),
+            bestHandName: myP.hand?.name || prev.bestHandName,
+            totalProfit: prev.totalProfit + profit,
+          };
+          savePokerStats(updated);
+          return updated;
+        });
+      }
+    } else if (activeRoom) {
+      supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_ACTION', {
+        playerId: targetId,
+        action,
+      });
     }
-
-    // Record stats
-    setStats((prev) => {
-      const profit = snap.payoutSummary?.netProfit || 0;
-      const isWin = profit > 0;
-      const updated: PokerStats = {
-        gamesPlayed: prev.gamesPlayed + 1,
-        handsWon: isWin ? prev.handsWon + 1 : prev.handsWon,
-        largestPotWon: Math.max(prev.largestPotWon, snap.payoutSummary?.totalWon || 0),
-        bestHandName: snap.playerHand?.name || prev.bestHandName,
-        totalProfit: prev.totalProfit + profit,
-      };
-      savePokerStats(updated);
-      return updated;
-    });
   };
 
   const handleThreeCardNewRound = () => {
-    if (!threeCardEngineRef.current) return;
     setIsVictoryAnim(false);
-    threeCardEngineRef.current.newRound();
-    setThreeCardSnapshot(threeCardEngineRef.current.getSnapshot());
+    const isHost = activeRoom?.hostId === currentPlayerId || !activeRoom;
+    if (isHost && threeCardEngineRef.current) {
+      threeCardEngineRef.current.newRound();
+      const snap = threeCardEngineRef.current.getSnapshot();
+      setThreeCardSnapshot(snap);
+      if (activeRoom) {
+        supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+      }
+    } else if (activeRoom) {
+      supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_NEW_ROUND', {});
+    }
   };
 
   const handleUpdateSettings = (newSettings: Partial<GameSettings>) => {
@@ -468,7 +578,7 @@ export default function App() {
                   <span className="text-[#C5A880] font-bold">VIP Стол vs Дилер</span>
                   <span aria-hidden="true">·</span>
                   <span className="text-stone-300">
-                    Фишки: ${(threeCardSnapshot?.playerChips || 0).toLocaleString()}
+                    Фишки: ${(threeCardSnapshot?.players?.find((p) => p.id === currentPlayerId)?.chips ?? threeCardSnapshot?.playerChips ?? 0).toLocaleString()}
                   </span>
                 </>
               ) : (
@@ -585,6 +695,8 @@ export default function App() {
               {threeCardSnapshot && (
                 <ThreeCardPokerTable
                   snapshot={threeCardSnapshot}
+                  currentPlayerId={currentPlayerId}
+                  isHost={activeRoom?.hostId === currentPlayerId || !activeRoom}
                   onSetBets={handleThreeCardSetBets}
                   onDeal={handleThreeCardDeal}
                   onAction={handleThreeCardAction}

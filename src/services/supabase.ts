@@ -248,6 +248,22 @@ export class SupabasePokerService {
   }
 
   /**
+   * Broadcast in-game real-time event (bets, actions, snapshots)
+   */
+  broadcastGameEvent(roomCode: string, type: string, payload: unknown): void {
+    this.broadcast(roomCode, { type, payload });
+  }
+
+  /**
+   * Update chip stack of a player in a room
+   */
+  updatePlayerChips(code: string, playerId: string, newChips: number): void {
+    const players = this.getRoomPlayers(code);
+    const updated = players.map((p) => (p.id === playerId ? { ...p, chips: newChips } : p));
+    this.saveRoomPlayers(code, updated);
+  }
+
+  /**
    * Subscribe to real-time events for a room (Supabase Realtime Channel emulation)
    */
   subscribe(roomCode: string, callback: (event: { type: string; payload: unknown }) => void): () => void {

@@ -96,16 +96,16 @@ export const PokerTable: React.FC<PokerTableProps> = ({
     const angle = (relativePos / numPlayers) * 2 * Math.PI + Math.PI / 2;
 
     // Oval radii percentages
-    const rx = 37; // horizontal % radius
-    const ry = 29; // vertical % radius
+    const rx = 36; // horizontal % radius
+    const ry = 30; // vertical % radius
 
     // Add extra inner padding for top and bottom seats
     const isBottomSeat = relativePos === 0;
     const isTopSeat = Math.abs(relativePos - numPlayers / 2) < 0.6;
 
     let yOffset = 0;
-    if (isBottomSeat) yOffset = 5; // Place human seat cleanly below community cards
-    if (isTopSeat) yOffset = 3; // Keep top seat away from top rail
+    if (isBottomSeat) yOffset = 4; // Place human seat cleanly below community cards
+    if (isTopSeat) yOffset = 1; // Keep top seat away from top rail
 
     const x = 50 + rx * Math.cos(angle);
     const y = 50 + ry * Math.sin(angle) + yOffset;
@@ -114,10 +114,10 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   };
 
   return (
-    <div className="relative w-full max-w-6xl md:max-w-7xl h-full max-h-[66vh] md:max-h-[71vh] aspect-[16/9] mx-auto select-none p-2 md:p-3 flex items-center justify-center transition-all duration-500 ease-out">
+    <div className="relative w-full max-w-6xl md:max-w-7xl h-full max-h-[58vh] md:max-h-[71vh] min-h-[270px] md:aspect-[16/9] mx-auto select-none p-1 md:p-3 flex items-center justify-center transition-all duration-500 ease-out">
       {/* Outer Polished Mahogany Wooden Rail */}
       <div
-        className="relative w-full h-full rounded-[140px] md:rounded-[220px] p-4 md:p-7 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border-4 border-amber-950/80 bg-gradient-to-b from-[#2a140e] via-[#1a0a06] to-[#0e0503] transition-all duration-500"
+        className="relative w-full h-full rounded-[60px] md:rounded-[220px] p-2 md:p-7 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border-4 border-amber-950/80 bg-gradient-to-b from-[#2a140e] via-[#1a0a06] to-[#0e0503] transition-all duration-500"
         style={{
           boxShadow:
             '0 30px 80px rgba(0, 0, 0, 0.95), inset 0 2px 4px rgba(255, 215, 0, 0.2), inset 0 -4px 10px rgba(0, 0, 0, 0.9)',
@@ -125,18 +125,18 @@ export const PokerTable: React.FC<PokerTableProps> = ({
       >
         {/* Leather Padded Armrest Ring */}
         <div
-          className="relative w-full h-full rounded-[120px] md:rounded-[190px] p-2 md:p-3 bg-gradient-to-b from-stone-900 via-stone-950 to-black border border-stone-800"
+          className="relative w-full h-full rounded-[52px] md:rounded-[190px] p-1 md:p-3 bg-gradient-to-b from-stone-900 via-stone-950 to-black border border-stone-800"
           style={{
             boxShadow: 'inset 0 4px 12px rgba(0, 0, 0, 0.9), 0 2px 4px rgba(255, 255, 255, 0.05)',
           }}
         >
           {/* Main Felt Surface */}
           <div
-            className={`relative w-full h-full rounded-[105px] md:rounded-[170px] bg-gradient-to-b ${currentTheme.outerFelt} ${currentTheme.ringGlow} border-2 border-stone-800/80 overflow-hidden flex flex-col items-center justify-center`}
+            className={`relative w-full h-full rounded-[46px] md:rounded-[170px] bg-gradient-to-b ${currentTheme.outerFelt} ${currentTheme.ringGlow} border-2 border-stone-800/80 overflow-hidden flex flex-col items-center justify-center`}
           >
             {/* Table Betting Line Arc */}
             <div
-              className={`absolute inset-7 md:inset-14 rounded-[85px] md:rounded-[140px] border-2 border-dashed ${currentTheme.lineColor} pointer-events-none opacity-60`}
+              className={`absolute inset-4 md:inset-14 rounded-[38px] md:rounded-[140px] border-2 border-dashed ${currentTheme.lineColor} pointer-events-none opacity-60`}
             />
 
             {/* Subtle Royal Crest / Felt Watermark */}
@@ -179,7 +179,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
               </div>
 
               {/* Community Cards Rack */}
-              <div className="flex items-center gap-1.5 md:gap-2.5 p-1.5 md:p-2 rounded-2xl bg-black/40 border border-amber-500/20 backdrop-blur-xs">
+              <div className="flex items-center gap-1 md:gap-2.5 p-1 md:p-2 rounded-xl md:rounded-2xl bg-black/40 border border-amber-500/20 backdrop-blur-xs scale-90 sm:scale-100">
                 {Array.from({ length: 5 }).map((_, idx) => {
                   const card = communityCards[idx];
                   return (
@@ -193,8 +193,8 @@ export const PokerTable: React.FC<PokerTableProps> = ({
                           isWinning={winnerPlayerIds.length > 0}
                         />
                       ) : (
-                        <div className="w-14 h-20 rounded-lg border-2 border-dashed border-white/10 bg-black/20 flex flex-col items-center justify-center text-white/20">
-                          <span className="text-[10px] uppercase font-bold tracking-wider">
+                        <div className="w-10 h-14 md:w-14 md:h-20 rounded-md md:rounded-lg border-2 border-dashed border-white/10 bg-black/20 flex flex-col items-center justify-center text-white/20">
+                          <span className="text-[8px] md:text-[10px] uppercase font-bold tracking-wider">
                             {idx < 3 ? 'Flop' : idx === 3 ? 'Turn' : 'River'}
                           </span>
                         </div>

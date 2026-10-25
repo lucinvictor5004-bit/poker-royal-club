@@ -125,7 +125,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm">🂠</span>
+                  <Layers className="w-4 h-4 text-[#C5A880]" />
                   <span className="text-xs font-bold text-[#C5A880]">Трёхкарточный</span>
                 </div>
                 <p className="text-[10px] text-stone-400 mt-1 leading-snug">

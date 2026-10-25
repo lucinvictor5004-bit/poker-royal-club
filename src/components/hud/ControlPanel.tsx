@@ -143,44 +143,44 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       data-testid="poker-control-panel"
     >
       {/* Top Slider & Quick Bet Presets Row */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-3 pb-3 border-b border-stone-800">
-        {/* Quick Bet Buttons */}
-        <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-2 md:gap-3 pb-2 md:pb-3 border-b border-stone-800">
+        {/* Quick Bet Buttons - horizontally swipeable on mobile */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto pb-0.5 shrink-0 flex-nowrap">
           <button
             type="button"
             onClick={() => {
               setBetSize(minTargetRaise);
               sounds.playChipClick();
             }}
-            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition-colors cursor-pointer"
+            className="px-2 md:px-2.5 py-1 text-[11px] md:text-xs font-semibold rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
             Мин (${minTargetRaise})
           </button>
           <button
             type="button"
             onClick={() => applyQuickBet(0.25)}
-            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition-colors cursor-pointer"
+            className="px-2 md:px-2.5 py-1 text-[11px] md:text-xs font-semibold rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
-            25% Банка
+            25%
           </button>
           <button
             type="button"
             onClick={() => applyQuickBet(0.5)}
-            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition-colors cursor-pointer"
+            className="px-2 md:px-2.5 py-1 text-[11px] md:text-xs font-semibold rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
-            50% Банка
+            50%
           </button>
           <button
             type="button"
             onClick={() => applyQuickBet(0.75)}
-            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition-colors cursor-pointer"
+            className="px-2 md:px-2.5 py-1 text-[11px] md:text-xs font-semibold rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
-            75% Банка
+            75%
           </button>
           <button
             type="button"
             onClick={() => applyQuickBet(1.0)}
-            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-950 hover:bg-amber-900 text-amber-200 border border-amber-700/60 transition-colors cursor-pointer"
+            className="px-2 md:px-2.5 py-1 text-[11px] md:text-xs font-semibold rounded-lg bg-amber-950 hover:bg-amber-900 text-amber-200 border border-amber-700/60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
             Банк (${totalPot})
           </button>
@@ -190,14 +190,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               setBetSize(maxTargetRaise);
               sounds.playChipClick();
             }}
-            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-red-950 hover:bg-red-900 text-red-200 border border-red-700/60 transition-colors cursor-pointer"
+            className="px-2 md:px-2.5 py-1 text-[11px] md:text-xs font-bold rounded-lg bg-red-950 hover:bg-red-900 text-red-200 border border-red-700/60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
             All-In (${maxTargetRaise})
           </button>
         </div>
 
         {/* Bet Slider and Value Input */}
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
           <input
             type="range"
             min={minTargetRaise}
@@ -206,9 +206,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             value={betSize}
             onChange={(e) => setBetSize(Number(e.target.value))}
             aria-label="Размер ставки"
-            className="w-full md:w-44 accent-amber-500 cursor-pointer"
+            className="w-full md:w-44 accent-amber-500 cursor-pointer h-5"
           />
-          <div className="flex items-center gap-1 font-mono font-bold text-amber-400 bg-stone-900 px-3 py-1 rounded-lg border border-amber-500/40 tabular-nums">
+          <div className="flex items-center gap-1 font-mono font-bold text-amber-400 bg-stone-900 px-2.5 py-0.5 md:py-1 rounded-lg border border-amber-500/40 tabular-nums shrink-0 text-xs md:text-sm">
             <span>$</span>
             <input
               type="number"
@@ -220,22 +220,22 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 if (!isNaN(val)) setBetSize(Math.min(maxTargetRaise, Math.max(minTargetRaise, val)));
               }}
               aria-label="Ввести ставку числом"
-              className="w-16 bg-transparent text-amber-400 text-right focus:outline-none"
+              className="w-14 md:w-16 bg-transparent text-amber-400 text-right focus:outline-none"
             />
           </div>
         </div>
       </div>
 
-      {/* Bottom Main Action Buttons Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-3">
+      {/* Bottom Main Action Buttons Row - min 44px touch targets on mobile */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 md:gap-2 pt-2 md:pt-3">
         {/* Fold Button */}
         <button
           type="button"
           onClick={handleFold}
-          className="flex flex-col items-center justify-center py-2.5 md:py-3 px-3 rounded-xl font-bold bg-gradient-to-b from-rose-900 via-rose-950 to-black hover:from-rose-800 hover:to-rose-900 text-rose-200 border border-rose-700/60 shadow-lg active:scale-95 transition-all cursor-pointer"
+          className="flex flex-col items-center justify-center min-h-[44px] py-1.5 md:py-3 px-2 md:px-3 rounded-xl font-bold bg-gradient-to-b from-rose-900 via-rose-950 to-black hover:from-rose-800 hover:to-rose-900 text-rose-200 border border-rose-700/60 shadow-lg active:scale-95 transition-all cursor-pointer"
         >
-          <span className="text-sm md:text-base">Фолд (Сброс)</span>
-          <span className="text-[10px] text-rose-400/80 font-normal">[F]</span>
+          <span className="text-xs md:text-base">Фолд (Сброс)</span>
+          <span className="hidden md:inline text-[10px] text-rose-400/80 font-normal">[F]</span>
         </button>
 
         {/* Check or Call Button */}
@@ -243,19 +243,19 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <button
             type="button"
             onClick={handleCheck}
-            className="flex flex-col items-center justify-center py-2.5 md:py-3 px-3 rounded-xl font-bold bg-gradient-to-b from-emerald-800 via-emerald-950 to-black hover:from-emerald-700 hover:to-emerald-900 text-emerald-200 border border-emerald-500/60 shadow-lg active:scale-95 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center min-h-[44px] py-1.5 md:py-3 px-2 md:px-3 rounded-xl font-bold bg-gradient-to-b from-emerald-800 via-emerald-950 to-black hover:from-emerald-700 hover:to-emerald-900 text-emerald-200 border border-emerald-500/60 shadow-lg active:scale-95 transition-all cursor-pointer"
           >
-            <span className="text-sm md:text-base">Чек</span>
-            <span className="text-[10px] text-emerald-400/80 font-normal">[C] Пропустить</span>
+            <span className="text-xs md:text-base">Чек</span>
+            <span className="hidden md:inline text-[10px] text-emerald-400/80 font-normal">[C] Пропустить</span>
           </button>
         ) : (
           <button
             type="button"
             onClick={handleCall}
-            className="flex flex-col items-center justify-center py-2.5 md:py-3 px-3 rounded-xl font-bold bg-gradient-to-b from-blue-800 via-blue-950 to-black hover:from-blue-700 hover:to-blue-900 text-blue-100 border border-blue-500/60 shadow-lg active:scale-95 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center min-h-[44px] py-1.5 md:py-3 px-2 md:px-3 rounded-xl font-bold bg-gradient-to-b from-blue-800 via-blue-950 to-black hover:from-blue-700 hover:to-blue-900 text-blue-100 border border-blue-500/60 shadow-lg active:scale-95 transition-all cursor-pointer"
           >
-            <span className="text-sm md:text-base">Колл ${actualCallCost}</span>
-            <span className="text-[10px] text-blue-300/80 font-normal">[C] Уравнять</span>
+            <span className="text-xs md:text-base">Колл ${actualCallCost}</span>
+            <span className="hidden md:inline text-[10px] text-blue-300/80 font-normal">[C] Уравнять</span>
           </button>
         )}
 
@@ -263,22 +263,22 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <button
           type="button"
           onClick={handleBetRaise}
-          className="flex flex-col items-center justify-center py-2.5 md:py-3 px-3 rounded-xl font-bold bg-gradient-to-b from-amber-600 via-amber-700 to-amber-900 hover:from-amber-500 hover:to-amber-600 text-amber-950 font-black border border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)] active:scale-95 transition-all cursor-pointer"
+          className="flex flex-col items-center justify-center min-h-[44px] py-1.5 md:py-3 px-2 md:px-3 rounded-xl font-bold bg-gradient-to-b from-amber-600 via-amber-700 to-amber-900 hover:from-amber-500 hover:to-amber-600 text-amber-950 font-black border border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)] active:scale-95 transition-all cursor-pointer"
         >
-          <span className="text-sm md:text-base">
-            {highestBet > 0 ? `Рейз до $${betSize}` : `Ставка $${betSize}`}
+          <span className="text-xs md:text-base">
+            {highestBet > 0 ? `Рейз $${betSize}` : `Ставка $${betSize}`}
           </span>
-          <span className="text-[10px] text-amber-950/80 font-normal">[R] Повысить</span>
+          <span className="hidden md:inline text-[10px] text-amber-950/80 font-normal">[R] Повысить</span>
         </button>
 
         {/* All-In Button */}
         <button
           type="button"
           onClick={handleAllIn}
-          className="flex flex-col items-center justify-center py-2.5 md:py-3 px-3 rounded-xl font-bold bg-gradient-to-b from-red-700 via-red-900 to-black hover:from-red-600 hover:to-red-800 text-white border border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] active:scale-95 transition-all cursor-pointer"
+          className="flex flex-col items-center justify-center min-h-[44px] py-1.5 md:py-3 px-2 md:px-3 rounded-xl font-bold bg-gradient-to-b from-red-700 via-red-900 to-black hover:from-red-600 hover:to-red-800 text-white border border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] active:scale-95 transition-all cursor-pointer"
         >
-          <span className="text-sm md:text-base">Ва-Банк (All-In)</span>
-          <span className="text-[10px] text-red-200/80 font-normal font-mono">[A] ${chips}</span>
+          <span className="text-xs md:text-base">All-In (${chips})</span>
+          <span className="hidden md:inline text-[10px] text-red-200/80 font-normal font-mono">[A]</span>
         </button>
       </div>
     </div>
