@@ -132,6 +132,11 @@ export default function App() {
 
         if (isHost) {
           supabasePoker.broadcastGameEvent(room.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+        } else {
+          supabasePoker.broadcastGameEvent(room.code, 'REQUEST_STATE_SYNC', { requesterId: currentPlayerId });
+          setTimeout(() => {
+            supabasePoker.broadcastGameEvent(room.code, 'REQUEST_STATE_SYNC', { requesterId: currentPlayerId });
+          }, 600);
         }
       } else {
         // Texas Hold'em with real human room players (NO bots!)
@@ -171,6 +176,10 @@ export default function App() {
           supabasePoker.broadcastGameEvent(room.code, 'TEXAS_SYNC_STATE', { snapshot: snap });
         } else {
           setSnapshot(engine.getSnapshot());
+          supabasePoker.broadcastGameEvent(room.code, 'REQUEST_STATE_SYNC', { requesterId: currentPlayerId });
+          setTimeout(() => {
+            supabasePoker.broadcastGameEvent(room.code, 'REQUEST_STATE_SYNC', { requesterId: currentPlayerId });
+          }, 600);
         }
         setView('game');
         setIsVictoryAnim(false);
@@ -187,7 +196,19 @@ export default function App() {
       if (!event) return;
       const isHost = activeRoom.hostId === currentPlayerId;
 
-      if (event.type === 'PLAYER_JOINED' || event.type === 'PLAYERS_UPDATED') {
+      if (event.type === 'REQUEST_STATE_SYNC') {
+        if (isHost) {
+          if (activeRoom.mode === 'three_card' && threeCardEngineRef.current) {
+            supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', {
+              snapshot: threeCardEngineRef.current.getSnapshot(),
+            });
+          } else if (activeRoom.mode !== 'three_card' && engineRef.current) {
+            supabasePoker.broadcastGameEvent(activeRoom.code, 'TEXAS_SYNC_STATE', {
+              snapshot: engineRef.current.getSnapshot(),
+            });
+          }
+        }
+      } else if (event.type === 'PLAYER_JOINED' || event.type === 'PLAYERS_UPDATED') {
         if (event.payload?.players) {
           setRoomPlayers(event.payload.players);
           if (threeCardEngineRef.current && activeRoom.mode === 'three_card') {
