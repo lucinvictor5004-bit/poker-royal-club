@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Player } from '../../game/engine/Player.ts';
 import { CardComponent, type CardBackStyle } from '../cards/CardComponent.tsx';
 import { ChipStack } from '../chips/ChipStack.tsx';
@@ -20,6 +21,9 @@ interface PlayerSeatProps {
   showHoleCards?: boolean;
   backStyle?: CardBackStyle;
   cardSize?: 'sm' | 'md';
+  seatDealOrder?: number;
+  dealFromX?: number;
+  dealFromY?: number;
   onRemoveBot?: (botId: string) => void;
 }
 
@@ -34,48 +38,60 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
   showHoleCards,
   backStyle = 'classic-royal',
   cardSize = 'sm',
+  seatDealOrder = 0,
+  dealFromX = 0,
+  dealFromY = -75,
   onRemoveBot,
 }) => {
   const isHuman = isCurrentPlayer || player.isHuman;
   const isFolded = player.folded;
-  const isAllIn = player.isAllIn;
   const shouldShowCards = showHoleCards !== undefined ? showHoleCards : player.showCards;
 
-  // Avatar gradient styles based on avatarSeed
   const avatarGradients = [
-    'from-amber-600 to-yellow-800',
-    'from-emerald-600 to-teal-800',
-    'from-blue-600 to-indigo-800',
-    'from-purple-600 to-fuchsia-900',
-    'from-rose-600 to-red-900',
-    'from-cyan-600 to-sky-900',
-    'from-amber-500 to-orange-700',
-    'from-slate-600 to-stone-800',
-    'from-violet-600 to-purple-800',
-    'from-teal-500 to-emerald-900',
+    'from-[#3d2b1f] to-[#1a110b]',
+    'from-[#133829] to-[#081b13]',
+    'from-[#172a45] to-[#0a1322]',
+    'from-[#351b42] to-[#170b1d]',
+    'from-[#47161e] to-[#1f080c]',
+    'from-[#163642] to-[#09181e]',
   ];
   const avatarBg = avatarGradients[(player.avatarSeed || 0) % avatarGradients.length];
 
   return (
-    <div
-      className={`relative flex flex-col items-center select-none transition-all duration-300 ${
-        isFolded ? 'opacity-40 grayscale-[50%]' : 'opacity-100'
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.92 }}
+      animate={{
+        opacity: isFolded ? 0.45 : 1,
+        scale: isActive ? 1.03 : 1,
+      }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      className={`relative flex flex-col items-center select-none ${
+        isFolded ? 'grayscale-[55%]' : ''
       }`}
       data-testid={`player-seat-${player.id}`}
     >
-      {/* Winner Fanfare Glow */}
-      {isWinner && (
-        <div className="absolute -inset-4 bg-gradient-to-r from-amber-400/30 via-yellow-300/40 to-amber-500/30 rounded-full blur-xl animate-pulse pointer-events-none" />
-      )}
+      {/* Winner Spotlight Aura */}
+      <AnimatePresence>
+        {isWinner && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1.08 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.45 }}
+            className="absolute -inset-4 bg-[radial-gradient(circle,rgba(212,175,55,0.38)_0%,transparent_70%)] rounded-full blur-md pointer-events-none"
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Hole Cards */}
-      <div className="relative flex items-center justify-center -space-x-4 mb-1 z-10">
+      {/* Hole Cards with Staggered Dealing from Dealer Shoe */}
+      <div className="relative flex items-center justify-center -space-x-3 md:-space-x-3.5 mb-1.5 z-10">
         {(player.holeCards || []).map((card, idx) => {
           const rotation = idx === 0 ? '-rotate-6' : 'rotate-6';
-          const isWinningCard = isWinner;
+          const dealDelayMs = seatDealOrder * 150 + idx * 180;
           return (
             <div
-              key={card.id || idx}
+              key={card.id || `${player.id}-card-${idx}`}
               className={`transform transition-transform duration-300 ${rotation} ${
                 isWinner ? '-translate-y-2' : ''
               }`}
@@ -83,98 +99,93 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
               <CardComponent
                 card={card}
                 faceDown={!shouldShowCards}
-                isWinning={isWinningCard}
+                isWinning={isWinner}
                 size={cardSize}
                 backStyle={backStyle}
+                dealDelayMs={dealDelayMs}
+                dealFromX={dealFromX}
+                dealFromY={dealFromY}
+                playDealSound={idx === 0 && seatDealOrder < 3}
               />
             </div>
           );
         })}
       </div>
 
-      {/* Main Seat Badge */}
+      {/* Main Luxury Seat Plaque */}
       <div
-        className={`relative flex items-center gap-1.5 md:gap-2 px-1.5 md:px-2.5 py-1 md:py-1.5 rounded-lg md:rounded-xl border backdrop-blur-md transition-all duration-300 min-w-[85px] md:min-w-[140px] ${
+        className={`relative flex items-center gap-1.5 md:gap-2.5 px-2 md:px-3 py-1 md:py-1.5 rounded-xl border backdrop-blur-md transition-all duration-300 min-w-[92px] md:min-w-[144px] ${
           isActive
-            ? 'bg-amber-950/80 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)] ring-1 md:ring-2 ring-amber-400/50'
+            ? 'bg-[#191610]/95 border-[#D4AF37] shadow-[0_0_24px_rgba(212,175,55,0.45),0_8px_20px_rgba(0,0,0,0.85)]'
             : isWinner
-            ? 'bg-amber-900/80 border-yellow-300 shadow-[0_0_20px_rgba(253,224,71,0.6)]'
-            : 'bg-black/75 border-stone-700/60 shadow-lg'
+            ? 'bg-[#1f1a10]/95 border-[#facc15] shadow-[0_0_28px_rgba(250,204,21,0.55)]'
+            : 'bg-[#0e1014]/90 border-stone-700/70 shadow-[0_8px_20px_rgba(0,0,0,0.85)]'
         }`}
       >
-        {/* Active Player Timer Ring */}
+        {/* Smooth Active Turn Border Ring */}
         {isActive && (
-          <div className="absolute -inset-1 rounded-xl md:rounded-2xl border-2 border-amber-400 animate-pulse pointer-events-none" />
+          <motion.div
+            layoutId="active-turn-ring"
+            className="absolute -inset-[2px] rounded-xl border border-[#D4AF37]/80 pointer-events-none"
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          />
         )}
 
-        {/* Avatar with Difficulty / Human indicator */}
+        {/* Player Medallion Avatar */}
         <div className="relative shrink-0">
           <div
             className={`w-6 h-6 md:w-8 md:h-8 rounded-full bg-gradient-to-br ${avatarBg} border ${
-              isActive ? 'border-amber-300' : 'border-stone-500'
-            } flex items-center justify-center text-white font-bold text-[10px] md:text-xs shadow-inner`}
+              isActive ? 'border-[#D4AF37]' : 'border-[#C5A880]/50'
+            } flex items-center justify-center text-[#F3E5AB] font-serif font-bold text-[10px] md:text-xs shadow-inner`}
           >
             {player.name.charAt(0).toUpperCase()}
           </div>
-
-          {/* Difficulty pill indicator on bot */}
-          {!isHuman && (
-            <span
-              className={`absolute -bottom-1 -right-1 text-[7px] md:text-[8px] px-0.5 md:px-1 font-mono font-bold rounded uppercase ${
-                player.difficulty === 'pro'
-                  ? 'bg-rose-900 text-rose-200 border border-rose-500'
-                  : player.difficulty === 'medium'
-                  ? 'bg-blue-900 text-blue-200 border border-blue-500'
-                  : 'bg-stone-800 text-stone-300 border border-stone-600'
-              }`}
-            >
-              {player.difficulty === 'pro' ? 'P' : player.difficulty === 'medium' ? 'M' : 'N'}
-            </span>
-          )}
         </div>
 
-        {/* Player Name and Chip Balance */}
+        {/* Player Name & Tabular Stack */}
         <div className="flex flex-col min-w-0 flex-1">
-          <span
-            className={`text-[10px] md:text-xs font-semibold truncate ${
-              isHuman ? 'text-amber-300 font-bold' : 'text-stone-200'
-            }`}
-          >
-            {player.name}
-          </span>
+          <div className="flex items-center gap-1">
+            <span
+              className={`text-[10px] md:text-xs font-semibold truncate ${
+                isCurrentPlayer ? 'text-[#F3E5AB] font-bold' : 'text-stone-200'
+              }`}
+            >
+              {player.name}
+            </span>
+          </div>
 
-          <span className="font-mono text-[9px] md:text-xs font-bold text-amber-400 tabular-nums leading-none">
+          <span className="font-mono text-[10px] md:text-xs font-bold text-[#C5A880] tabular-nums leading-tight">
             ${player.chips.toLocaleString()}
           </span>
         </div>
 
-        {/* Role Tokens: Dealer, SB, BB */}
+        {/* Casino Table Role Buttons: Dealer, SB, BB */}
         {isDealer && (
           <div
-            className="absolute -top-2.5 -right-2 w-5 h-5 rounded-full bg-amber-400 border border-amber-200 text-slate-950 text-[10px] font-black flex items-center justify-center shadow-md"
-            title="Dealer Button"
+            className="absolute -top-2.5 -right-2 w-5 h-5 md:w-6 md:h-6 rounded-full bg-gradient-to-b from-[#fdfbf7] to-[#d6ceb8] border-2 border-[#8c734b] text-stone-950 text-[9px] md:text-[10px] font-serif font-black flex items-center justify-center shadow-[0_3px_6px_rgba(0,0,0,0.75)]"
+            title="Кнопка дилера (DEALER)"
           >
             D
           </div>
         )}
-        {isSB && (
+        {isSB && !isDealer && (
           <div
-            className="absolute -top-2.5 -right-2 w-5 h-5 rounded-full bg-purple-600 border border-purple-300 text-white text-[9px] font-black flex items-center justify-center shadow-md"
-            title="Small Blind"
+            className="absolute -top-2.5 -right-2 w-5 h-5 rounded-full bg-[#1e293b] border border-[#94a3b8] text-slate-100 text-[8px] font-mono font-bold flex items-center justify-center shadow-md"
+            title="Малый блайнд (Small Blind)"
           >
             SB
           </div>
         )}
         {isBB && (
           <div
-            className="absolute -top-2.5 -right-2 w-5 h-5 rounded-full bg-orange-600 border border-orange-300 text-white text-[9px] font-black flex items-center justify-center shadow-md"
-            title="Big Blind"
+            className="absolute -top-2.5 -left-2 w-5 h-5 rounded-full bg-[#3b1d11] border border-[#C5A880] text-[#F3E5AB] text-[8px] font-mono font-bold flex items-center justify-center shadow-md"
+            title="Большой блайнд (Big Blind)"
           >
             BB
           </div>
         )}
 
-        {/* Bot Removal Button */}
+        {/* Optional Seat Removal */}
         {!isHuman && onRemoveBot && (
           <button
             type="button"
@@ -182,52 +193,67 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
               e.stopPropagation();
               onRemoveBot(player.id);
             }}
-            className="absolute -top-2 -left-2 w-4 h-4 md:w-5 md:h-5 rounded-full bg-rose-950/90 hover:bg-rose-800 border border-rose-600 text-rose-200 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-md opacity-80 hover:opacity-100"
-            title={`Удалить ${player.name} со стола`}
-            aria-label={`Удалить ${player.name} со стола`}
+            className="absolute -top-2 -left-2 w-4 h-4 md:w-5 md:h-5 rounded-full bg-rose-950/90 hover:bg-rose-800 border border-rose-600 text-rose-200 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-md"
+            title={`Убрать ${player.name}`}
           >
-            <X className="w-2.5 h-2.5 md:w-3 md:h-3" />
+            <X className="w-2.5 h-2.5" />
           </button>
         )}
       </div>
 
-      {/* Action / Status Pill Banner */}
-      {player.lastAction && !isFolded && (
-        <div
-          className={`mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-md animate-fade-in ${
-            player.lastAction === 'all-in'
-              ? 'bg-red-700 text-white border border-red-400 animate-bounce'
-              : player.lastAction === 'raise' || player.lastAction === 'bet'
-              ? 'bg-amber-600 text-black font-extrabold border border-amber-300'
+      {/* Action Callout Tag */}
+      <AnimatePresence mode="wait">
+        {player.lastAction && !isFolded && (
+          <motion.div
+            key={`${player.lastAction}-${player.lastActionAmount}`}
+            initial={{ opacity: 0, y: -4, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
+            className={`mt-1 px-2 py-0.5 rounded-md text-[9px] md:text-[10px] font-mono font-bold uppercase tracking-wider shadow-md ${
+              player.lastAction === 'all-in'
+                ? 'bg-[#7f1d1d] text-red-100 border border-red-400/60'
+                : player.lastAction === 'raise' || player.lastAction === 'bet'
+                ? 'bg-[#2a2112] text-[#F3E5AB] border border-[#D4AF37]/60'
+                : player.lastAction === 'call'
+                ? 'bg-[#132a1f] text-emerald-200 border border-emerald-500/40'
+                : 'bg-stone-900/90 text-stone-300 border border-stone-700'
+            }`}
+          >
+            {player.lastAction === 'all-in'
+              ? 'ALL-IN'
+              : player.lastAction === 'raise'
+              ? `RAISE $${player.lastActionAmount}`
+              : player.lastAction === 'bet'
+              ? `BET $${player.lastActionAmount}`
               : player.lastAction === 'call'
-              ? 'bg-blue-600 text-white border border-blue-400'
-              : 'bg-stone-700 text-stone-200 border border-stone-500'
-          }`}
-        >
-          {player.lastAction === 'all-in'
-            ? 'ALL-IN'
-            : player.lastAction === 'raise'
-            ? `RAISE $${player.lastActionAmount}`
-            : player.lastAction === 'bet'
-            ? `BET $${player.lastActionAmount}`
-            : player.lastAction === 'call'
-            ? `CALL $${player.lastActionAmount}`
-            : 'CHECK'}
-        </div>
-      )}
+              ? `CALL $${player.lastActionAmount}`
+              : 'CHECK'}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {isFolded && (
-        <div className="mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-stone-800 text-stone-400 border border-stone-700">
-          FOLD
+        <div className="mt-1 px-2 py-0.5 rounded-md text-[9px] font-mono font-bold uppercase bg-stone-900/90 text-stone-400 border border-stone-800">
+          ПАС
         </div>
       )}
 
-      {/* Active Street Bet Chips */}
-      {player.currentBet > 0 && (
-        <div className="mt-1.5 z-20">
-          <ChipStack amount={player.currentBet} size="xs" showLabel={true} />
-        </div>
-      )}
-    </div>
+      {/* Committed Street Chips */}
+      <AnimatePresence>
+        {player.currentBet > 0 && (
+          <motion.div
+            key={`bet-${player.currentBet}`}
+            initial={{ opacity: 0, y: -6, scale: 0.85 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-1 z-20"
+          >
+            <ChipStack amount={player.currentBet} size="xs" showLabel={true} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };

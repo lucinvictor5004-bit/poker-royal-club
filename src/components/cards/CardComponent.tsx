@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import { Card } from '../../game/engine/Card.ts';
+import { sounds } from '../../utils/soundEffects.ts';
 
 export type CardBackStyle = 'classic-royal' | 'geometric-gold' | 'crimson-dragon' | 'midnight-stars';
 
@@ -16,6 +18,14 @@ interface CardProps {
   size?: 'sm' | 'md' | 'lg';
   backStyle?: CardBackStyle;
   className?: string;
+  /** Delay in ms for staggered dealing animation */
+  dealDelayMs?: number;
+  /** Starting X offset in px relative to final card position (simulates flying from dealer shoe) */
+  dealFromX?: number;
+  /** Starting Y offset in px relative to final card position (simulates flying from dealer shoe) */
+  dealFromY?: number;
+  /** Play subtle card dealing sound when animation starts */
+  playDealSound?: boolean;
 }
 
 export const CardComponent: React.FC<CardProps> = ({
@@ -26,76 +36,163 @@ export const CardComponent: React.FC<CardProps> = ({
   size = 'md',
   backStyle = 'classic-royal',
   className = '',
+  dealDelayMs = 0,
+  dealFromX = 0,
+  dealFromY = -90,
+  playDealSound = false,
 }) => {
-  // Dimensions
+  const hasPlayedSoundRef = useRef(false);
+
+  const rawCard = card as Card | { suit: Card['suit']; rank: Card['rank']; id?: string } | undefined;
+  const hydratedCard = rawCard
+    ? rawCard instanceof Card
+      ? rawCard
+      : new Card(rawCard.suit, rawCard.rank)
+    : null;
+
+  const cardIdentity = hydratedCard ? hydratedCard.id : 'facedown';
+
+  useEffect(() => {
+    if (!playDealSound || hasPlayedSoundRef.current) return;
+    hasPlayedSoundRef.current = true;
+    const timer = setTimeout(() => {
+      sounds.playCardSlide();
+    }, dealDelayMs);
+    return () => clearTimeout(timer);
+  }, [cardIdentity, dealDelayMs, playDealSound]);
+
+  // Dimensions with classic poker bridge/jumbo proportions
   const sizeClasses = {
-    sm: 'w-8 h-11 md:w-10 md:h-14 text-[10px] md:text-xs rounded-sm md:rounded-md',
-    md: 'w-10 h-14 md:w-14 md:h-20 text-xs md:text-sm rounded-md md:rounded-lg',
-    lg: 'w-16 h-22 md:w-20 md:h-28 text-sm md:text-base rounded-lg md:rounded-xl',
+    sm: 'w-9 h-13 md:w-11 md:h-16 text-[10px] md:text-xs rounded-[5px] md:rounded-[7px]',
+    md: 'w-11 h-16 md:w-15 md:h-22 text-xs md:text-sm rounded-[6px] md:rounded-[9px]',
+    lg: 'w-16 h-23 md:w-21 md:h-30 text-sm md:text-base rounded-[8px] md:rounded-[11px]',
   }[size];
 
-  if (faceDown || !card) {
+  const delaySec = Math.max(0, dealDelayMs) / 1000;
+
+  if (faceDown || !hydratedCard) {
     return (
-      <div
-        className={`relative select-none shadow-xl border border-amber-900/40 overflow-hidden transform-gpu transition-all duration-300 ${sizeClasses} ${className}`}
-        style={{ perspective: 1000 }}
+      <motion.div
+        key={`back-${cardIdentity}`}
+        initial={{
+          opacity: 0,
+          x: dealFromX,
+          y: dealFromY,
+          scale: 0.72,
+          rotate: -8,
+        }}
+        animate={{
+          opacity: 1,
+          x: 0,
+          y: 0,
+          scale: 1,
+          rotate: 0,
+        }}
+        transition={{
+          duration: 0.52,
+          delay: delaySec,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className={`relative select-none playing-card-back border border-[#C5A880]/45 overflow-hidden transform-gpu ${sizeClasses} ${className}`}
       >
         <CardBackPattern backStyle={backStyle} size={size} />
-      </div>
+      </motion.div>
     );
   }
 
-  const rawCard = card as Card | { suit: Card['suit']; rank: Card['rank'] };
-  const hydratedCard = rawCard instanceof Card ? rawCard : new Card(rawCard.suit, rawCard.rank);
   const isRed = hydratedCard.isRed;
-  const suitColor = isRed ? 'text-red-600' : 'text-slate-900';
+  const suitColor = isRed ? 'text-[#b91c1c]' : 'text-[#141619]';
   const glowStyle = isWinning
-    ? 'ring-2 ring-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.8)] scale-105 z-10'
-    : 'shadow-lg hover:shadow-xl';
-  const dimStyle = dimmed ? 'opacity-40 grayscale-[40%]' : 'opacity-100';
+    ? 'ring-2 ring-[#D4AF37] shadow-[0_0_26px_rgba(212,175,55,0.85)] -translate-y-1.5 scale-105 z-20'
+    : 'hover:-translate-y-0.5';
+  const dimStyle = dimmed ? 'opacity-40 grayscale-[45%]' : 'opacity-100';
 
   return (
-    <div
-      className={`relative select-none bg-gradient-to-br from-stone-50 via-white to-stone-100 border border-stone-300/80 font-sans flex flex-col justify-between p-1 md:p-1.5 transition-all duration-300 transform-gpu ${sizeClasses} ${glowStyle} ${dimStyle} ${className}`}
+    <motion.div
+      key={`face-${hydratedCard.id}`}
+      initial={{
+        opacity: 0,
+        x: dealFromX,
+        y: dealFromY,
+        scale: 0.72,
+        rotateY: 165,
+        rotateZ: -6,
+      }}
+      animate={{
+        opacity: dimmed ? 0.4 : 1,
+        x: 0,
+        y: isWinning ? -6 : 0,
+        scale: isWinning ? 1.05 : 1,
+        rotateY: 0,
+        rotateZ: 0,
+      }}
+      transition={{
+        duration: 0.56,
+        delay: delaySec,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      style={{ transformStyle: 'preserve-3d' }}
+      className={`relative select-none playing-card-face font-sans flex flex-col justify-between p-1 md:p-1.5 transition-shadow duration-300 transform-gpu ${sizeClasses} ${glowStyle} ${dimStyle} ${className}`}
       data-testid={`card-${hydratedCard.toString()}`}
     >
-      {/* Top Left Corner */}
-      <div className={`flex flex-col items-center leading-none ${suitColor}`}>
-        <span className="font-bold tracking-tighter">{hydratedCard.rankLabel}</span>
-        <span className="text-[10px] md:text-xs">{hydratedCard.symbol}</span>
-      </div>
+      {/* Inner subtle border frame on ivory stock */}
+      <div className="absolute inset-[2px] md:inset-[3px] rounded-[4px] md:rounded-[6px] border border-stone-400/20 pointer-events-none" />
 
-      {/* Center Art / Large Suit */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <span
-          className={`opacity-20 font-serif leading-none select-none ${suitColor} ${
-            size === 'sm' ? 'text-xl' : size === 'md' ? 'text-3xl' : 'text-5xl'
-          }`}
-        >
+      {/* Top Left Corner Index */}
+      <div className={`relative z-10 flex flex-col items-center leading-none ${suitColor}`}>
+        <span className="font-extrabold tracking-tighter leading-[0.95]">
+          {hydratedCard.rankLabel}
+        </span>
+        <span className="text-[9px] md:text-[11px] leading-none mt-0.5">
           {hydratedCard.symbol}
         </span>
       </div>
 
-      {/* Court card insignia accent */}
-      {hydratedCard.rank >= 11 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-5/6 h-5/6 border border-amber-500/20 rounded flex items-center justify-center">
-            <span className={`font-serif font-black opacity-30 ${suitColor}`}>
+      {/* Center Art / Pip or Royal Court Frame */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        {hydratedCard.rank >= 11 ? (
+          <div className="w-[72%] h-[68%] rounded-[3px] border border-[#C5A880]/45 bg-gradient-to-b from-[#f6f0e2]/80 via-transparent to-[#efe6d2]/80 flex flex-col items-center justify-center relative overflow-hidden">
+            <span
+              className={`font-serif font-black leading-none select-none opacity-25 ${suitColor} ${
+                size === 'sm' ? 'text-lg' : size === 'md' ? 'text-2xl' : 'text-4xl'
+              }`}
+            >
               {hydratedCard.rankLabel}
             </span>
+            <span
+              className={`leading-none select-none ${suitColor} ${
+                size === 'sm' ? 'text-xs' : size === 'md' ? 'text-base' : 'text-2xl'
+              }`}
+            >
+              {hydratedCard.symbol}
+            </span>
           </div>
-        </div>
-      )}
-
-      {/* Bottom Right Corner (inverted) */}
-      <div className={`flex flex-col items-center leading-none rotate-180 self-end ${suitColor}`}>
-        <span className="font-bold tracking-tighter">{hydratedCard.rankLabel}</span>
-        <span className="text-[10px] md:text-xs">{hydratedCard.symbol}</span>
+        ) : (
+          <span
+            className={`font-serif leading-none select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.08)] ${suitColor} ${
+              size === 'sm' ? 'text-lg' : size === 'md' ? 'text-2xl md:text-3xl' : 'text-4xl'
+            }`}
+          >
+            {hydratedCard.symbol}
+          </span>
+        )}
       </div>
 
-      {/* Subtle glossy sheen line */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent pointer-events-none" />
-    </div>
+      {/* Bottom Right Corner Index (inverted) */}
+      <div
+        className={`relative z-10 flex flex-col items-center leading-none rotate-180 self-end ${suitColor}`}
+      >
+        <span className="font-extrabold tracking-tighter leading-[0.95]">
+          {hydratedCard.rankLabel}
+        </span>
+        <span className="text-[9px] md:text-[11px] leading-none mt-0.5">
+          {hydratedCard.symbol}
+        </span>
+      </div>
+
+      {/* Subtle warm specular paper sheen */}
+      <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-tr from-transparent via-white/30 to-transparent pointer-events-none" />
+    </motion.div>
   );
 };
 
@@ -105,30 +202,30 @@ const CardBackPattern: React.FC<{ backStyle: CardBackStyle; size: 'sm' | 'md' | 
   switch (backStyle) {
     case 'geometric-gold':
       return (
-        <div className="w-full h-full bg-slate-950 p-1 flex items-center justify-center">
-          <div className="w-full h-full border border-amber-500/70 rounded flex items-center justify-center bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:6px_6px]">
-            <div className="w-4 h-4 border border-amber-400 rotate-45 flex items-center justify-center">
-              <span className="text-amber-400 text-[8px] -rotate-45">♠</span>
+        <div className="w-full h-full bg-[#111216] p-[3px] flex items-center justify-center">
+          <div className="w-full h-full border border-[#C5A880]/70 rounded-[3px] flex items-center justify-center bg-[radial-gradient(#C5A880_1px,transparent_1px)] [background-size:6px_6px]">
+            <div className="w-4 h-4 md:w-5 md:h-5 border border-[#C5A880] rotate-45 flex items-center justify-center bg-[#111216]/90 shadow-inner">
+              <span className="text-[#C5A880] text-[8px] md:text-[10px] -rotate-45">♠</span>
             </div>
           </div>
         </div>
       );
     case 'crimson-dragon':
       return (
-        <div className="w-full h-full bg-red-950 p-1 flex items-center justify-center">
-          <div className="w-full h-full border border-red-500/60 rounded flex items-center justify-center bg-[radial-gradient(#ef4444_1px,transparent_1px)] [background-size:5px_5px]">
-            <div className="w-5 h-5 rounded-full border border-amber-400/80 flex items-center justify-center">
-              <span className="text-amber-300 text-[10px]">♦</span>
+        <div className="w-full h-full bg-[#2b090e] p-[3px] flex items-center justify-center">
+          <div className="w-full h-full border border-[#D4AF37]/65 rounded-[3px] flex items-center justify-center bg-[radial-gradient(#991b1b_1px,transparent_1px)] [background-size:5px_5px]">
+            <div className="w-4 h-4 md:w-5 md:h-5 rounded-full border border-[#D4AF37]/90 flex items-center justify-center bg-[#2b090e]/90">
+              <span className="text-[#D4AF37] text-[9px] md:text-[10px]">♦</span>
             </div>
           </div>
         </div>
       );
     case 'midnight-stars':
       return (
-        <div className="w-full h-full bg-indigo-950 p-1 flex items-center justify-center">
-          <div className="w-full h-full border border-indigo-400/50 rounded flex items-center justify-center bg-[radial-gradient(#818cf8_1px,transparent_1px)] [background-size:6px_6px]">
-            <div className="w-4 h-4 rounded-sm border border-cyan-300/80 rotate-45 flex items-center justify-center">
-              <span className="text-cyan-200 text-[8px] -rotate-45">★</span>
+        <div className="w-full h-full bg-[#0c1326] p-[3px] flex items-center justify-center">
+          <div className="w-full h-full border border-sky-300/50 rounded-[3px] flex items-center justify-center bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:6px_6px]">
+            <div className="w-4 h-4 md:w-5 md:h-5 rounded-sm border border-sky-200/80 rotate-45 flex items-center justify-center bg-[#0c1326]/90">
+              <span className="text-sky-200 text-[8px] md:text-[9px] -rotate-45">♠</span>
             </div>
           </div>
         </div>
@@ -136,10 +233,12 @@ const CardBackPattern: React.FC<{ backStyle: CardBackStyle; size: 'sm' | 'md' | 
     case 'classic-royal':
     default:
       return (
-        <div className="w-full h-full bg-blue-950 p-1 flex items-center justify-center">
-          <div className="w-full h-full border-2 border-amber-400/60 rounded flex flex-col items-center justify-center bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:5px_5px]">
-            <div className="w-5 h-5 rounded-full border border-amber-300/90 flex items-center justify-center bg-blue-900/80">
-              <span className="text-amber-300 text-[10px] leading-none">♠</span>
+        <div className="w-full h-full bg-[#141b2d] p-[3px] flex items-center justify-center">
+          <div className="w-full h-full border border-[#C5A880]/75 rounded-[3px] flex flex-col items-center justify-center bg-[radial-gradient(rgba(197,168,128,0.42)_1px,transparent_1px)] [background-size:5px_5px]">
+            <div className="w-4 h-4 md:w-6 md:h-6 rounded-full border border-[#C5A880] flex items-center justify-center bg-[#0f1523] shadow-md">
+              <span className="text-[#C5A880] text-[9px] md:text-[11px] leading-none font-serif">
+                ♠
+              </span>
             </div>
           </div>
         </div>

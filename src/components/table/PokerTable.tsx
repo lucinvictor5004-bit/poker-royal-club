@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '../../game/engine/Card.ts';
 import { Player } from '../../game/engine/Player.ts';
 import { type PotSlice } from '../../game/engine/PotManager.ts';
@@ -46,147 +47,148 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   feltColor = 'emerald',
   backStyle = 'classic-royal',
   onRemoveBot,
-  onAddBot,
 }) => {
-  // Felt color theme configurations
+  // Realistic casino wool felt palettes
   const feltThemes: Record<
     TableFeltColor,
     {
       outerFelt: string;
-      innerFelt: string;
       lineColor: string;
-      ringGlow: string;
     }
   > = {
     emerald: {
-      outerFelt: 'from-emerald-950 via-[#073820] to-[#042414]',
-      innerFelt: 'bg-[#084226]',
-      lineColor: 'border-emerald-500/25',
-      ringGlow: 'shadow-[inset_0_0_80px_rgba(4,40,20,0.8)]',
+      outerFelt: 'from-[#0a4027] via-[#07301d] to-[#03190e]',
+      lineColor: 'border-[#C5A880]/30',
     },
     sapphire: {
-      outerFelt: 'from-slate-950 via-[#0a2540] to-[#061528]',
-      innerFelt: 'bg-[#0c2f50]',
-      lineColor: 'border-cyan-500/25',
-      ringGlow: 'shadow-[inset_0_0_80px_rgba(6,25,50,0.8)]',
+      outerFelt: 'from-[#0d2d4d] via-[#082038] to-[#04101e]',
+      lineColor: 'border-[#C5A880]/30',
     },
     burgundy: {
-      outerFelt: 'from-red-950 via-[#3a0d16] to-[#20050b]',
-      innerFelt: 'bg-[#48121c]',
-      lineColor: 'border-red-400/25',
-      ringGlow: 'shadow-[inset_0_0_80px_rgba(45,10,18,0.8)]',
+      outerFelt: 'from-[#4a121d] via-[#330b13] to-[#1a0408]',
+      lineColor: 'border-[#C5A880]/30',
     },
     midnight: {
-      outerFelt: 'from-neutral-950 via-[#18181b] to-[#09090b]',
-      innerFelt: 'bg-[#1e1e24]',
-      lineColor: 'border-amber-400/20',
-      ringGlow: 'shadow-[inset_0_0_80px_rgba(0,0,0,0.9)]',
+      outerFelt: 'from-[#1f2128] via-[#15171c] to-[#0b0c0f]',
+      lineColor: 'border-[#C5A880]/30',
     },
   };
 
   const currentTheme = feltThemes[feltColor];
 
-  // Radial positioning of players around oval
   // Anchor on currentPlayerId so each player sees themselves at bottom center
   const myIdx = currentPlayerId ? players.findIndex((p) => p.id === currentPlayerId) : -1;
   const humanIdx = myIdx !== -1 ? myIdx : players.findIndex((p) => p.isHuman);
   const anchorIdx = humanIdx !== -1 ? humanIdx : 0;
   const numPlayers = players.length;
 
-  const getSeatPosition = (index: number) => {
-    // Relative offset so human is at angle 90 degrees (bottom)
+  const getSeatGeometry = (index: number) => {
     const relativePos = (index - anchorIdx + numPlayers) % numPlayers;
     const angle = (relativePos / numPlayers) * 2 * Math.PI + Math.PI / 2;
 
-    // Oval radii percentages
-    const rx = 36; // horizontal % radius
-    const ry = 30; // vertical % radius
+    const rx = 36;
+    const ry = 30;
 
-    // Add extra inner padding for top and bottom seats
     const isBottomSeat = relativePos === 0;
     const isTopSeat = Math.abs(relativePos - numPlayers / 2) < 0.6;
 
     let yOffset = 0;
-    if (isBottomSeat) yOffset = 4; // Place human seat cleanly below community cards
-    if (isTopSeat) yOffset = 1; // Keep top seat away from top rail
+    if (isBottomSeat) yOffset = 4;
+    if (isTopSeat) yOffset = 2;
 
     const x = 50 + rx * Math.cos(angle);
     const y = 50 + ry * Math.sin(angle) + yOffset;
 
-    return { left: `${x}%`, top: `${y}%` };
+    // Approximate vector from top-center Dealer Shoe (50%, 10%) to seat (x%, y%)
+    const dealFromX = Math.round((50 - x) * 3.2);
+    const dealFromY = Math.round((12 - y) * 2.4);
+
+    return {
+      pos: { left: `${x}%`, top: `${y}%` },
+      dealFromX,
+      dealFromY,
+      relativePos,
+    };
   };
 
   return (
-    <div className="relative w-full max-w-6xl md:max-w-7xl h-full max-h-[58vh] md:max-h-[71vh] min-h-[270px] md:aspect-[16/9] mx-auto select-none p-1 md:p-3 flex items-center justify-center transition-all duration-500 ease-out">
+    <div className="relative w-full max-w-6xl md:max-w-7xl h-full max-h-[60vh] md:max-h-[72vh] min-h-[280px] md:aspect-[16/9] mx-auto select-none p-1 md:p-3 flex items-center justify-center">
       {/* Outer Polished Mahogany Wooden Rail */}
-      <div
-        className="relative w-full h-full rounded-[60px] md:rounded-[220px] p-2 md:p-7 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border-4 border-amber-950/80 bg-gradient-to-b from-[#2a140e] via-[#1a0a06] to-[#0e0503] transition-all duration-500"
-        style={{
-          boxShadow:
-            '0 30px 80px rgba(0, 0, 0, 0.95), inset 0 2px 4px rgba(255, 215, 0, 0.2), inset 0 -4px 10px rgba(0, 0, 0, 0.9)',
-        }}
-      >
-        {/* Leather Padded Armrest Ring */}
-        <div
-          className="relative w-full h-full rounded-[52px] md:rounded-[190px] p-1 md:p-3 bg-gradient-to-b from-stone-900 via-stone-950 to-black border border-stone-800"
-          style={{
-            boxShadow: 'inset 0 4px 12px rgba(0, 0, 0, 0.9), 0 2px 4px rgba(255, 255, 255, 0.05)',
-          }}
-        >
-          {/* Main Felt Surface */}
+      <div className="relative w-full h-full rounded-[64px] md:rounded-[220px] p-2.5 md:p-6 mahogany-rail border-2 border-[#542b1c]">
+        {/* Brass Accent Trim Line */}
+        <div className="relative w-full h-full rounded-[56px] md:rounded-[196px] p-1.5 md:p-3 leather-armrest border border-[#C5A880]/25">
+          {/* Main Casino Felt Surface */}
           <div
-            className={`relative w-full h-full rounded-[46px] md:rounded-[170px] bg-gradient-to-b ${currentTheme.outerFelt} ${currentTheme.ringGlow} border-2 border-stone-800/80 overflow-hidden flex flex-col items-center justify-center`}
+            className={`relative w-full h-full rounded-[48px] md:rounded-[178px] bg-gradient-to-b ${currentTheme.outerFelt} casino-felt-surface border-2 border-[#C5A880]/25 overflow-hidden flex flex-col items-center justify-center`}
           >
-            {/* Table Betting Line Arc */}
+            {/* Brass Silk-Screened Betting Line & Inner Corner Accents */}
             <div
-              className={`absolute inset-4 md:inset-14 rounded-[38px] md:rounded-[140px] border-2 border-dashed ${currentTheme.lineColor} pointer-events-none opacity-60`}
+              className={`absolute inset-4 md:inset-12 rounded-[38px] md:rounded-[144px] border ${currentTheme.lineColor} pointer-events-none`}
+            />
+            <div
+              className={`absolute inset-5 md:inset-[52px] rounded-[36px] md:rounded-[140px] border border-dashed ${currentTheme.lineColor} opacity-45 pointer-events-none`}
             />
 
-            {/* Subtle Royal Crest / Felt Watermark */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-10">
-              <span className="text-6xl md:text-8xl text-amber-200 font-serif">♠</span>
-              <span className="text-xs md:text-sm font-serif tracking-[0.3em] uppercase text-amber-100 font-bold mt-2">
-                Royal Texas Hold'em
-              </span>
+            {/* Physical Dealer Shoe & Deck at Top Center of Table */}
+            <div className="absolute top-2.5 md:top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-3 py-1 rounded-xl bg-black/55 border border-[#C5A880]/30 shadow-lg backdrop-blur-xs pointer-events-none">
+              <div className="relative w-5 h-7 md:w-6 md:h-8 rounded-[3px] bg-gradient-to-b from-[#1e293b] to-[#0f172a] border border-[#C5A880]/70 shadow-md flex items-center justify-center">
+                <div className="absolute -top-[2px] -left-[2px] w-full h-full rounded-[3px] bg-[#141b2d] border border-[#C5A880]/50 flex items-center justify-center">
+                  <span className="text-[9px] text-[#C5A880] font-serif">♠</span>
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] md:text-[10px] font-serif font-bold tracking-widest text-[#C5A880] uppercase leading-none">
+                  Колода дилера
+                </span>
+                <span className="text-[8px] md:text-[9px] text-stone-400 font-mono leading-tight">
+                  52 карты · 6-Max
+                </span>
+              </div>
             </div>
 
             {/* Center Pot & Community Cards Area */}
-            <div className="relative z-10 flex flex-col items-center gap-1.5 -translate-y-4 md:-translate-y-6">
-              {/* Pot Display */}
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/75 border border-amber-500/40 shadow-xl backdrop-blur-md">
-                  <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
-                    Банк:
+            <div className="relative z-10 flex flex-col items-center gap-2 -translate-y-2 md:-translate-y-4">
+              {/* Total Pot Plaque */}
+              <motion.div
+                key={`pot-${totalPot}`}
+                initial={{ scale: 0.95 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.25 }}
+                className="flex flex-col items-center"
+              >
+                <div className="flex items-center gap-2.5 px-3.5 py-1 rounded-full bg-[#0b0d10]/85 border border-[#C5A880]/45 shadow-[0_8px_24px_rgba(0,0,0,0.75)] backdrop-blur-md">
+                  <span className="text-[10px] md:text-[11px] font-serif font-bold text-[#C5A880] uppercase tracking-widest">
+                    Банк
                   </span>
-                  <span className="font-mono text-sm md:text-base font-black text-amber-300 tabular-nums">
+                  <span className="font-mono text-sm md:text-base font-extrabold text-[#F3E5AB] tabular-nums">
                     ${totalPot.toLocaleString()}
                   </span>
-                  {totalPot > 0 && (
-                    <ChipStack amount={totalPot} size="xs" showLabel={false} />
-                  )}
+                  {totalPot > 0 && <ChipStack amount={totalPot} size="xs" showLabel={false} />}
                 </div>
 
                 {/* Side Pots breakdown if any */}
                 {pots.length > 1 && (
-                  <div className="flex items-center gap-1.5 mt-0.5 text-[9px] font-mono text-stone-300">
+                  <div className="flex items-center gap-1.5 mt-1 text-[9px] font-mono text-stone-300">
                     {pots.map((pot, idx) => (
                       <span
                         key={idx}
-                        className="px-1.5 py-0.5 rounded bg-black/50 border border-stone-700 tabular-nums"
+                        className="px-2 py-0.5 rounded bg-black/60 border border-stone-700 tabular-nums"
                       >
-                        {idx === 0 ? 'Main' : `Side ${idx}`}: ${pot.amount}
+                        {idx === 0 ? 'Осн.' : `Побоч. ${idx}`}: ${pot.amount}
                       </span>
                     ))}
                   </div>
                 )}
-              </div>
+              </motion.div>
 
-              {/* Community Cards Rack */}
-              <div className="flex items-center gap-1 md:gap-2.5 p-1 md:p-2 rounded-xl md:rounded-2xl bg-black/40 border border-amber-500/20 backdrop-blur-xs scale-90 sm:scale-100">
+              {/* Community Cards Brass Frame Rack with Staggered Dealing */}
+              <div className="flex items-center gap-1.5 md:gap-2.5 p-1.5 md:p-2.5 rounded-2xl bg-black/45 border border-[#C5A880]/30 shadow-[inset_0_2px_10px_rgba(0,0,0,0.7)] backdrop-blur-xs scale-90 sm:scale-100">
                 {Array.from({ length: 5 }).map((_, idx) => {
                   const card = communityCards[idx];
+                  // Flop cards (0, 1, 2) deal with 210ms stagger; Turn (3) and River (4) deal immediately with 100ms delay
+                  const dealDelayMs = idx < 3 ? idx * 210 : 90;
                   return (
-                    <div key={idx} className="relative">
+                    <div key={card ? card.id : `empty-slot-${idx}`} className="relative">
                       {card ? (
                         <CardComponent
                           card={card}
@@ -194,10 +196,14 @@ export const PokerTable: React.FC<PokerTableProps> = ({
                           size="md"
                           backStyle={backStyle}
                           isWinning={winnerPlayerIds.length > 0}
+                          dealDelayMs={dealDelayMs}
+                          dealFromX={(2 - idx) * 28}
+                          dealFromY={-85}
+                          playDealSound={true}
                         />
                       ) : (
-                        <div className="w-10 h-14 md:w-14 md:h-20 rounded-md md:rounded-lg border-2 border-dashed border-white/10 bg-black/20 flex flex-col items-center justify-center text-white/20">
-                          <span className="text-[8px] md:text-[10px] uppercase font-bold tracking-wider">
+                        <div className="w-11 h-16 md:w-15 md:h-22 rounded-[6px] md:rounded-[9px] border border-[#C5A880]/20 bg-black/25 flex flex-col items-center justify-center text-[#C5A880]/30 shadow-inner">
+                          <span className="text-[8px] md:text-[9px] font-serif uppercase font-bold tracking-widest">
                             {idx < 3 ? 'Flop' : idx === 3 ? 'Turn' : 'River'}
                           </span>
                         </div>
@@ -208,16 +214,24 @@ export const PokerTable: React.FC<PokerTableProps> = ({
               </div>
 
               {/* Winner Announcement Banner */}
-              {winnerDescriptions.length > 0 && (
-                <div className="px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 text-black font-extrabold text-xs md:text-sm shadow-[0_0_25px_rgba(251,191,36,0.8)] border border-yellow-200 animate-pulse text-center max-w-md">
-                  {winnerDescriptions.join(' · ')}
-                </div>
-              )}
+              <AnimatePresence>
+                {winnerDescriptions.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.92 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.92 }}
+                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#241c0e] via-[#332712] to-[#241c0e] text-[#F3E5AB] font-serif font-bold text-xs md:text-sm shadow-[0_10px_30px_rgba(0,0,0,0.9),0_0_20px_rgba(212,175,55,0.4)] border border-[#D4AF37] text-center max-w-md"
+                  >
+                    {winnerDescriptions.join(' · ')}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Radial Player Seats */}
             {players.map((player, idx) => {
-              const pos = getSeatPosition(idx);
+              const { pos, dealFromX, dealFromY, relativePos } = getSeatGeometry(idx);
               const isActive = idx === activePlayerIdx;
               const isDealer = idx === dealerIdx;
               const isSB = idx === sbIdx;
@@ -243,12 +257,14 @@ export const PokerTable: React.FC<PokerTableProps> = ({
                     showHoleCards={isMe || isShowdown}
                     backStyle={backStyle}
                     cardSize={isMe ? 'md' : 'sm'}
+                    seatDealOrder={relativePos}
+                    dealFromX={dealFromX}
+                    dealFromY={dealFromY}
                     onRemoveBot={onRemoveBot}
                   />
                 </div>
               );
             })}
-
           </div>
         </div>
       </div>

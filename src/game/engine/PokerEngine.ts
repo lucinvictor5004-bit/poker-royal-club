@@ -657,6 +657,60 @@ export class PokerEngine {
     return snap;
   }
 
+  syncRoomPlayers(roomPlayers: Array<{ id: string; name: string; chips: number }>): boolean {
+    let changed = false;
+    for (const rp of roomPlayers) {
+      const existing = this.players.find((p) => p.id === rp.id);
+      if (existing) {
+        if (existing.name !== rp.name) {
+          existing.name = rp.name;
+          changed = true;
+        }
+        continue;
+      }
+
+      // Check if there is a placeholder seat ('player_seat_2') we can assign to this real player
+      const placeholderIdx = this.players.findIndex((p) => p.id === 'player_seat_2');
+      if (placeholderIdx !== -1) {
+        const oldP = this.players[placeholderIdx];
+        const replacement = new Player({
+          id: rp.id,
+          name: rp.name,
+          isHuman: true,
+          chips: oldP.chips,
+          avatarSeed: oldP.avatarSeed,
+        });
+        replacement.holeCards = [...oldP.holeCards];
+        replacement.currentBet = oldP.currentBet;
+        replacement.totalHandBet = oldP.totalHandBet;
+        replacement.folded = oldP.folded;
+        replacement.isAllIn = oldP.isAllIn;
+        replacement.isSittingOut = oldP.isSittingOut;
+        replacement.role = oldP.role;
+        replacement.lastAction = oldP.lastAction;
+        replacement.lastActionAmount = oldP.lastActionAmount;
+        replacement.showCards = oldP.showCards;
+        replacement.hasActedThisStreet = oldP.hasActedThisStreet;
+        this.players[placeholderIdx] = replacement;
+        changed = true;
+      } else if (this.players.length < 9) {
+        const newP = new Player({
+          id: rp.id,
+          name: rp.name,
+          isHuman: true,
+          chips: rp.chips,
+          avatarSeed: this.players.length,
+        });
+        if (this.phase !== 'idle' && this.phase !== 'hand_ended') {
+          newP.folded = true;
+        }
+        this.players.push(newP);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
   /**
    * Helper for Bot AI turn calculation
    */

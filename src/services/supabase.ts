@@ -12,6 +12,8 @@ import { createClient, type SupabaseClient, type RealtimeChannel } from '@supaba
  *
  * Works across ANY network in the world (different cities, mobile 4G/5G, home Wi-Fi, symmetric NATs):
  * 1. Global Cloud WebSocket Relay (MQTT over WSS port 443/8084/8884 — bypasses all NATs & firewalls, zero config)
+ *    - Uses BOTH live `/events` AND retained `/directory` + `/gamestate` topics so no player ever misses
+ *      lobby updates, game start, or table cards!
  * 2. Supabase Realtime Broadcast (automatically active if VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY are provided)
  * 3. PeerJS WebRTC DataChannel with STUN + TURN Relay Servers (TCP/TLS 443 & UDP)
  * 4. BroadcastChannel + LocalStorage (instant sync across tabs on the same device)
@@ -140,6 +142,8 @@ export class SupabasePokerService {
     string,
     { room: RoomRecord; players: RoomPlayerRecord[]; updatedAt: number }
   > = new Map();
+  private lastGameStateByRoom: Map<string, { type: string; payload: any; updatedAt: number }> =
+    new Map();
 
   // Optional official Supabase client
   private supabaseClient: SupabaseClient | null = null;
@@ -179,14 +183,50 @@ export class SupabasePokerService {
             this.memoryPlayers.set(code, players);
             this.notifyLocalListeners(code, {
               type: 'PLAYERS_UPDATED',
-              payload: { players },
+              payload: { players, room: this.getRoom(code) },
             });
+          } catch {
+            // ignore
+          }
+        } else if (e.key && e.key.startsWith('room_') && !e.key.startsWith('room_players_') && e.newValue) {
+          const code = e.key.replace('room_', '');
+          try {
+            const room = JSON.parse(e.newValue) as RoomRecord;
+            this.memoryRooms.set(code, room);
+            if (room.status === 'in_game') {
+              this.notifyLocalListeners(code, {
+                type: 'GAME_STARTED',
+                payload: { room, players: this.getRoomPlayers(code) },
+              });
+            }
           } catch {
             // ignore
           }
         }
       });
     }
+  }
+
+  /**
+   * Merges two player arrays by player.id, preserving seat ordering and newest properties.
+   */
+  private mergePlayersList(
+    existing: RoomPlayerRecord[],
+    incoming: RoomPlayerRecord[]
+  ): RoomPlayerRecord[] {
+    const map = new Map<string, RoomPlayerRecord>();
+    for (const p of existing) {
+      if (p && p.id) map.set(p.id, { ...p });
+    }
+    for (const p of incoming) {
+      if (p && p.id) {
+        const prev = map.get(p.id);
+        map.set(p.id, prev ? { ...prev, ...p } : { ...p });
+      }
+    }
+    return Array.from(map.values())
+      .sort((a, b) => (a.isHost === b.isHost ? a.joinedAt - b.joinedAt : a.isHost ? -1 : 1))
+      .map((p, idx) => ({ ...p, seatIndex: idx }));
   }
 
   /**
@@ -203,20 +243,23 @@ export class SupabasePokerService {
           clientId: `rcp_${this.instanceId}_${idx}`,
           clean: true,
           connectTimeout: 5000,
-          reconnectPeriod: 3000,
-          keepalive: 30,
+          reconnectPeriod: 2500,
+          keepalive: 25,
         });
 
         client.on('connect', () => {
-          // Re-subscribe to any active rooms
           this.subscribedRooms.forEach((code) => {
             client.subscribe(`${MQTT_TOPIC_PREFIX}/${code}/events`, { qos: 1 });
             client.subscribe(`${MQTT_TOPIC_PREFIX}/${code}/directory`, { qos: 1 });
+            client.subscribe(`${MQTT_TOPIC_PREFIX}/${code}/gamestate`, { qos: 1 });
           });
 
-          // If we are hosting a room, publish retained directory state
           if (this.hostRoomCode) {
             this.publishRetainedRoomDirectory(this.hostRoomCode);
+            const lastState = this.lastGameStateByRoom.get(this.hostRoomCode);
+            if (lastState) {
+              this.publishRetainedGameState(this.hostRoomCode, lastState.type, lastState.payload);
+            }
           }
         });
 
@@ -226,22 +269,62 @@ export class SupabasePokerService {
             if (!text) return;
             const parsed = JSON.parse(text);
 
+            // 1. Retained Directory Topic: room status + player list
             if (topic.endsWith('/directory')) {
               const { room, players, updatedAt } = parsed || {};
               if (room && room.code && Array.isArray(players)) {
                 const code = normalizeRoomCode(room.code);
                 const prev = this.directorySnapshots.get(code);
-                if (!prev || (updatedAt && updatedAt >= prev.updatedAt)) {
-                  this.directorySnapshots.set(code, {
-                    room,
-                    players,
-                    updatedAt: updatedAt || Date.now(),
+                const mergedPlayers = this.mergePlayersList(this.getRoomPlayers(code), players);
+
+                // Keep newest room status ('in_game' takes precedence once started)
+                const currentRoom = this.getRoom(code);
+                const effectiveRoom: RoomRecord =
+                  currentRoom && currentRoom.status === 'in_game'
+                    ? { ...room, status: 'in_game' }
+                    : room;
+
+                this.directorySnapshots.set(code, {
+                  room: effectiveRoom,
+                  players: mergedPlayers,
+                  updatedAt: updatedAt || Date.now(),
+                });
+
+                this.saveRoom(effectiveRoom);
+                this.saveRoomPlayers(code, mergedPlayers);
+
+                // Notify local listeners about updated players
+                this.notifyLocalListeners(code, {
+                  type: 'PLAYERS_UPDATED',
+                  payload: { room: effectiveRoom, players: mergedPlayers },
+                });
+
+                // CRITICAL: If the room is now 'in_game', notify local listeners so guests in the lobby immediately launch the game!
+                if (effectiveRoom.status === 'in_game' && (!prev || prev.room.status !== 'in_game')) {
+                  this.notifyLocalListeners(code, {
+                    type: 'GAME_STARTED',
+                    payload: { room: effectiveRoom, players: mergedPlayers },
+                  });
+                } else if (effectiveRoom.status === 'in_game') {
+                  // Also emit GAME_STARTED so any listener still in 'lobby' view transitions immediately
+                  this.notifyLocalListeners(code, {
+                    type: 'GAME_STARTED',
+                    payload: { room: effectiveRoom, players: mergedPlayers },
                   });
                 }
               }
               return;
             }
 
+            // 2. Retained GameState Topic: latest table snapshot
+            if (topic.endsWith('/gamestate')) {
+              if (parsed && parsed.channel && parsed.message) {
+                this.receiveEnvelope(parsed as NetworkEnvelope, 'mqtt');
+              }
+              return;
+            }
+
+            // 3. Live Events Topic
             if (topic.endsWith('/events') && parsed && parsed.channel && parsed.message) {
               this.receiveEnvelope(parsed as NetworkEnvelope, 'mqtt');
             }
@@ -282,13 +365,9 @@ export class SupabasePokerService {
       this.subscribedRooms.add(normalized);
       this.mqttClients.forEach((client) => {
         try {
-          if (client.connected) {
-            client.subscribe(`${MQTT_TOPIC_PREFIX}/${normalized}/events`, { qos: 1 });
-            client.subscribe(`${MQTT_TOPIC_PREFIX}/${normalized}/directory`, { qos: 1 });
-          } else {
-            client.subscribe(`${MQTT_TOPIC_PREFIX}/${normalized}/events`, { qos: 1 });
-            client.subscribe(`${MQTT_TOPIC_PREFIX}/${normalized}/directory`, { qos: 1 });
-          }
+          client.subscribe(`${MQTT_TOPIC_PREFIX}/${normalized}/events`, { qos: 1 });
+          client.subscribe(`${MQTT_TOPIC_PREFIX}/${normalized}/directory`, { qos: 1 });
+          client.subscribe(`${MQTT_TOPIC_PREFIX}/${normalized}/gamestate`, { qos: 1 });
         } catch {
           // ignore
         }
@@ -328,6 +407,40 @@ export class SupabasePokerService {
     this.mqttClients.forEach((client) => {
       try {
         client.publish(`${MQTT_TOPIC_PREFIX}/${normalized}/directory`, payload, {
+          qos: 1,
+          retain: true,
+        });
+      } catch {
+        // ignore
+      }
+    });
+  }
+
+  private publishRetainedGameState(code: string, type: string, statePayload: any): void {
+    const normalized = normalizeRoomCode(code);
+    this.lastGameStateByRoom.set(normalized, {
+      type,
+      payload: statePayload,
+      updatedAt: Date.now(),
+    });
+
+    const env: NetworkEnvelope = {
+      msgId: `state_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      senderInstanceId: this.instanceId,
+      channel: normalized,
+      message: {
+        type,
+        payload: statePayload,
+      },
+      timestamp: Date.now(),
+    };
+
+    this.seenMessageIds.add(env.msgId);
+    const serialized = JSON.stringify(env);
+
+    this.mqttClients.forEach((client) => {
+      try {
+        client.publish(`${MQTT_TOPIC_PREFIX}/${normalized}/gamestate`, serialized, {
           qos: 1,
           retain: true,
         });
@@ -378,7 +491,6 @@ export class SupabasePokerService {
           },
         };
 
-        // Send response over all transports so the requester receives it via whichever path is fastest
         this.sendNetworkEnvelope(normalizedChannel, responseMsg, senderConn);
 
         if (result.success && result.room && result.players) {
@@ -403,8 +515,9 @@ export class SupabasePokerService {
         const resolve = this.pendingJoinResolvers.get(requestId)!;
         this.pendingJoinResolvers.delete(requestId);
         if (success && room && players) {
+          const merged = this.mergePlayersList(this.getRoomPlayers(room.code), players);
           this.saveRoom(room);
-          this.saveRoomPlayers(room.code, players);
+          this.saveRoomPlayers(room.code, merged);
         }
         resolve({ success, room, player, players, error });
       }
@@ -418,18 +531,34 @@ export class SupabasePokerService {
       message.type === 'PLAYER_LEFT'
     ) {
       if (message.payload?.room) {
-        this.saveRoom(message.payload.room);
+        const currentRoom = this.getRoom(normalizedChannel);
+        const updatedRoom =
+          currentRoom && currentRoom.status === 'in_game'
+            ? { ...message.payload.room, status: 'in_game' as const }
+            : message.payload.room;
+        this.saveRoom(updatedRoom);
       }
       if (message.payload?.players) {
-        this.saveRoomPlayers(normalizedChannel, message.payload.players);
+        const merged =
+          message.type === 'PLAYER_LEFT'
+            ? message.payload.players
+            : this.mergePlayersList(this.getRoomPlayers(normalizedChannel), message.payload.players);
+        this.saveRoomPlayers(normalizedChannel, merged);
+        message.payload.players = merged;
       }
       if (this.hostRoomCode === normalizedChannel) {
         this.publishRetainedRoomDirectory(normalizedChannel);
       }
     } else if (message.type === 'GAME_STARTED' && message.payload?.room) {
-      this.saveRoom(message.payload.room);
+      const startedRoom: RoomRecord = { ...message.payload.room, status: 'in_game' };
+      this.saveRoom(startedRoom);
       if (message.payload?.players) {
-        this.saveRoomPlayers(normalizedChannel, message.payload.players);
+        const merged = this.mergePlayersList(
+          this.getRoomPlayers(normalizedChannel),
+          message.payload.players
+        );
+        this.saveRoomPlayers(normalizedChannel, merged);
+        message.payload.players = merged;
       }
       if (this.hostRoomCode === normalizedChannel) {
         this.publishRetainedRoomDirectory(normalizedChannel);
@@ -482,7 +611,7 @@ export class SupabasePokerService {
       joinedAt: Date.now(),
     };
 
-    const updatedPlayers = [...currentPlayers, newPlayer];
+    const updatedPlayers = this.mergePlayersList(currentPlayers, [newPlayer]);
     this.saveRoomPlayers(normalized, updatedPlayers);
 
     return {
@@ -670,7 +799,7 @@ export class SupabasePokerService {
     // Ensure we are subscribed to Cloud Relay & Supabase channels for this room code
     this.ensureRoomNetworkSubscription(formattedCode);
 
-    // 1. Check if the room is already cached locally (e.g., same browser)
+    // 1. Check if the room is already cached locally
     const localRoom = this.getRoom(formattedCode);
     if (localRoom) {
       const currentPlayers = this.getRoomPlayers(formattedCode);
@@ -689,8 +818,9 @@ export class SupabasePokerService {
         joinedAt: Date.now(),
       };
 
-      const updatedPlayers = [...currentPlayers, newPlayer];
+      const updatedPlayers = this.mergePlayersList(currentPlayers, [newPlayer]);
       this.saveRoomPlayers(formattedCode, updatedPlayers);
+      this.publishRetainedRoomDirectory(formattedCode);
 
       if (this.hostRoomCode !== formattedCode) {
         this.connectClientPeerToHost(formattedCode);
@@ -736,12 +866,11 @@ export class SupabasePokerService {
         });
       };
 
-      // Send immediately and retry every 1.1s in case the broker subscription just opened
       sendJoinRequest();
       retryInterval = setInterval(() => {
         sendJoinRequest();
 
-        // Also check if the MQTT retained directory already delivered the room snapshot!
+        // Check if the MQTT retained directory delivered the room snapshot
         const dir = this.directorySnapshots.get(formattedCode);
         if (dir && dir.room && !settled) {
           const existingPlayers = dir.players || [];
@@ -759,19 +888,20 @@ export class SupabasePokerService {
             seatIndex: existingPlayers.length,
             joinedAt: Date.now(),
           };
-          const updatedPlayers = [
-            ...existingPlayers.filter((p) => p.id !== playerId),
-            newPlayer,
-          ];
+          const updatedPlayers = this.mergePlayersList(existingPlayers, [newPlayer]);
           this.saveRoom(dir.room);
           this.saveRoomPlayers(formattedCode, updatedPlayers);
+
+          // Publish updated directory with this new player so Host and all guests see them immediately!
+          this.publishRetainedRoomDirectory(formattedCode);
+
           this.broadcast(formattedCode, {
             type: 'PLAYER_JOINED',
             payload: { room: dir.room, players: updatedPlayers, newPlayer },
           });
           finish({ success: true, room: dir.room, player: newPlayer });
         }
-      }, 900);
+      }, 700);
 
       // Also initiate PeerJS WebRTC connection with TURN servers in parallel
       try {
@@ -822,18 +952,17 @@ export class SupabasePokerService {
           });
 
           conn.on('error', () => {
-            // Do not abort here; Cloud WebSocket Relay (MQTT/Supabase) may still resolve
+            // Handled by Cloud WebSocket Relay
           });
         });
 
         clientPeer.on('error', () => {
-          // Do not abort here; Cloud WebSocket Relay (MQTT/Supabase) handles WAN traffic
+          // Handled by Cloud WebSocket Relay
         });
       } catch {
         // Ignore PeerJS init errors
       }
 
-      // Overall timeout (7.5 seconds to allow mobile 4G/5G networks to complete handshake)
       setTimeout(() => {
         if (!settled) {
           finish({
@@ -888,14 +1017,11 @@ export class SupabasePokerService {
     const players = this.getRoomPlayers(normalized);
     const updated = players.map((p) => (p.id === playerId ? { ...p, isReady: !p.isReady } : p));
     this.saveRoomPlayers(normalized, updated);
-
-    if (this.hostRoomCode === normalized) {
-      this.publishRetainedRoomDirectory(normalized);
-    }
+    this.publishRetainedRoomDirectory(normalized);
 
     this.broadcast(normalized, {
       type: 'PLAYERS_UPDATED',
-      payload: { players: updated },
+      payload: { players: updated, room: this.getRoom(normalized) },
     });
   }
 
@@ -907,16 +1033,35 @@ export class SupabasePokerService {
     const room = this.getRoom(normalized);
     if (!room) return;
 
-    room.status = 'in_game';
-    this.saveRoom(room);
+    const updatedRoom: RoomRecord = { ...room, status: 'in_game' };
+    this.saveRoom(updatedRoom);
 
     const players = this.getRoomPlayers(normalized);
+
+    // 1. Publish retained directory with status: 'in_game' so all brokers immediately push to guests
     this.publishRetainedRoomDirectory(normalized);
 
+    // 2. Broadcast GAME_STARTED immediately and repeat at 350ms & 900ms to guarantee delivery across mobile networks
+    const startPayload = { room: updatedRoom, players };
     this.broadcast(normalized, {
       type: 'GAME_STARTED',
-      payload: { room, players },
+      payload: startPayload,
     });
+
+    setTimeout(() => {
+      this.publishRetainedRoomDirectory(normalized);
+      this.sendNetworkEnvelope(normalized, {
+        type: 'GAME_STARTED',
+        payload: startPayload,
+      });
+    }, 350);
+
+    setTimeout(() => {
+      this.sendNetworkEnvelope(normalized, {
+        type: 'GAME_STARTED',
+        payload: startPayload,
+      });
+    }, 900);
   }
 
   /**
@@ -937,16 +1082,20 @@ export class SupabasePokerService {
       this.memoryRooms.delete(normalized);
       this.memoryPlayers.delete(normalized);
       this.directorySnapshots.delete(normalized);
+      this.lastGameStateByRoom.delete(normalized);
       try {
         localStorage.removeItem(`room_${normalized}`);
         localStorage.removeItem(`room_players_${normalized}`);
       } catch {
         // ignore
       }
-      // Clear retained room directory on MQTT brokers
       this.mqttClients.forEach((client) => {
         try {
           client.publish(`${MQTT_TOPIC_PREFIX}/${normalized}/directory`, '', {
+            qos: 1,
+            retain: true,
+          });
+          client.publish(`${MQTT_TOPIC_PREFIX}/${normalized}/gamestate`, '', {
             qos: 1,
             retain: true,
           });
@@ -960,6 +1109,8 @@ export class SupabasePokerService {
       room.hostName = players[0].name;
       this.saveRoom(room);
       this.saveRoomPlayers(normalized, players);
+      this.publishRetainedRoomDirectory(normalized);
+    } else {
       this.publishRetainedRoomDirectory(normalized);
     }
 
@@ -1016,6 +1167,11 @@ export class SupabasePokerService {
   broadcastGameEvent(roomCode: string, type: string, payload: unknown): void {
     const normalized = normalizeRoomCode(roomCode);
     this.broadcast(normalized, { type, payload });
+
+    // Also persist state snapshots on the retained `/gamestate` topic so any player entering the game receives it immediately
+    if (type === 'THREE_CARD_SYNC_STATE' || type === 'TEXAS_SYNC_STATE') {
+      this.publishRetainedGameState(normalized, type, payload);
+    }
   }
 
   /**
@@ -1140,9 +1296,7 @@ export class SupabasePokerService {
 
   private broadcast(channel: string, message: { type: string; payload: any }): void {
     const normalized = normalizeRoomCode(channel);
-    // 1. Notify local listeners in current tab
     this.notifyLocalListeners(normalized, message);
-    // 2. Send across all network transports
     this.sendNetworkEnvelope(normalized, message);
   }
 

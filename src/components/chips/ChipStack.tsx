@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { motion } from 'motion/react';
 
 export interface ChipConfig {
   value: number;
@@ -15,13 +16,62 @@ export interface ChipConfig {
 }
 
 export const CHIP_DENOMINATIONS: ChipConfig[] = [
-  { value: 5000, label: '5k', bgColor: 'bg-cyan-800', edgeColor: 'border-cyan-300', textColor: 'text-cyan-100', accentColor: 'bg-cyan-400' },
-  { value: 1000, label: '1k', bgColor: 'bg-amber-700', edgeColor: 'border-yellow-300', textColor: 'text-yellow-100', accentColor: 'bg-amber-300' },
-  { value: 500, label: '500', bgColor: 'bg-purple-800', edgeColor: 'border-purple-300', textColor: 'text-purple-100', accentColor: 'bg-purple-400' },
-  { value: 100, label: '100', bgColor: 'bg-neutral-900', edgeColor: 'border-neutral-400', textColor: 'text-white', accentColor: 'bg-white' },
-  { value: 25, label: '25', bgColor: 'bg-emerald-800', edgeColor: 'border-emerald-300', textColor: 'text-emerald-100', accentColor: 'bg-emerald-400' },
-  { value: 5, label: '5', bgColor: 'bg-red-800', edgeColor: 'border-red-300', textColor: 'text-red-100', accentColor: 'bg-white' },
-  { value: 1, label: '1', bgColor: 'bg-stone-300', edgeColor: 'border-stone-500', textColor: 'text-stone-900', accentColor: 'bg-blue-600' },
+  {
+    value: 5000,
+    label: '5K',
+    bgColor: 'bg-[#0e4f5c]',
+    edgeColor: 'border-[#67e8f9]',
+    textColor: 'text-cyan-50',
+    accentColor: 'bg-cyan-400',
+  },
+  {
+    value: 1000,
+    label: '1K',
+    bgColor: 'bg-[#92600e]',
+    edgeColor: 'border-[#fde047]',
+    textColor: 'text-amber-50',
+    accentColor: 'bg-amber-300',
+  },
+  {
+    value: 500,
+    label: '500',
+    bgColor: 'bg-[#4c1d6e]',
+    edgeColor: 'border-[#d8b4fe]',
+    textColor: 'text-purple-50',
+    accentColor: 'bg-purple-400',
+  },
+  {
+    value: 100,
+    label: '100',
+    bgColor: 'bg-[#17171a]',
+    edgeColor: 'border-[#C5A880]',
+    textColor: 'text-[#C5A880]',
+    accentColor: 'bg-[#C5A880]',
+  },
+  {
+    value: 25,
+    label: '25',
+    bgColor: 'bg-[#0b4f32]',
+    edgeColor: 'border-[#6ee7b7]',
+    textColor: 'text-emerald-50',
+    accentColor: 'bg-emerald-400',
+  },
+  {
+    value: 5,
+    label: '5',
+    bgColor: 'bg-[#7f1d1d]',
+    edgeColor: 'border-[#fca5a5]',
+    textColor: 'text-red-50',
+    accentColor: 'bg-white',
+  },
+  {
+    value: 1,
+    label: '1',
+    bgColor: 'bg-[#d6d3cd]',
+    edgeColor: 'border-[#57534e]',
+    textColor: 'text-stone-900',
+    accentColor: 'bg-blue-600',
+  },
 ];
 
 export function breakAmountIntoChips(amount: number): { config: ChipConfig; count: number }[] {
@@ -38,7 +88,6 @@ export function breakAmountIntoChips(amount: number): { config: ChipConfig; coun
     }
   }
 
-  // If there's still remainder less than $1
   if (result.length === 0 && amount > 0) {
     result.push({ config: CHIP_DENOMINATIONS[CHIP_DENOMINATIONS.length - 1], count: 1 });
   }
@@ -52,24 +101,25 @@ export const SingleChip: React.FC<{
   className?: string;
 }> = ({ config, size = 'sm', className = '' }) => {
   const sizeMap = {
-    xs: 'w-5 h-5 text-[9px]',
-    sm: 'w-7 h-7 text-[10px]',
-    md: 'w-9 h-9 text-xs',
+    xs: 'w-5 h-5 text-[8px]',
+    sm: 'w-7 h-7 text-[9px]',
+    md: 'w-9 h-9 text-[11px]',
   }[size];
 
   return (
     <div
-      className={`relative rounded-full select-none flex items-center justify-center font-bold font-mono shadow-md border-2 ${config.edgeColor} ${config.bgColor} ${sizeMap} ${className}`}
+      className={`relative rounded-full select-none flex items-center justify-center font-extrabold font-mono border-2 ${config.edgeColor} ${config.bgColor} ${sizeMap} ${className}`}
       style={{
-        boxShadow: '0 2px 5px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.4)',
+        boxShadow:
+          '0 3px 6px rgba(0,0,0,0.65), inset 0 1px 1px rgba(255,255,255,0.35), inset 0 -1px 2px rgba(0,0,0,0.5)',
       }}
     >
-      {/* Decorative dashed edge markings */}
-      <div className="absolute inset-0 rounded-full border border-dashed border-white/40 pointer-events-none" />
+      {/* Clay chip edge notches */}
+      <div className="absolute inset-[1px] rounded-full border border-dashed border-white/45 pointer-events-none" />
 
-      {/* Inner metallic / ring inlay */}
-      <div className="w-2/3 h-2/3 rounded-full border border-white/50 flex items-center justify-center bg-black/30 backdrop-blur-xs">
-        <span className={`leading-none drop-shadow-sm ${config.textColor}`}>
+      {/* Recessed center medallion */}
+      <div className="w-[70%] h-[70%] rounded-full border border-[#C5A880]/60 flex items-center justify-center bg-black/40 shadow-inner">
+        <span className={`leading-none tracking-tighter ${config.textColor}`}>
           {config.label}
         </span>
       </div>
@@ -88,8 +138,14 @@ export const ChipStack: React.FC<{
   const chipGroups = breakAmountIntoChips(amount);
 
   return (
-    <div className={`inline-flex items-center gap-1.5 select-none ${className}`}>
-      <div className="flex items-center -space-x-3.5">
+    <motion.div
+      key={amount}
+      initial={{ opacity: 0.6, scale: 0.85, y: 4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      className={`inline-flex items-center gap-1.5 select-none ${className}`}
+    >
+      <div className="flex items-center -space-x-3">
         {chipGroups.slice(0, 3).map((group, groupIdx) => (
           <div key={groupIdx} className="relative flex flex-col items-center">
             {Array.from({ length: Math.min(4, group.count) }).map((_, chipIdx) => (
@@ -98,7 +154,7 @@ export const ChipStack: React.FC<{
                 className={chipIdx > 0 ? '-mt-4.5' : ''}
                 style={{
                   zIndex: chipIdx + groupIdx * 5,
-                  transform: `translateY(${chipIdx * -1.5}px)`,
+                  transform: `translateY(${chipIdx * -1.8}px)`,
                 }}
               >
                 <SingleChip config={group.config} size={size} />
@@ -109,10 +165,10 @@ export const ChipStack: React.FC<{
       </div>
 
       {showLabel && (
-        <span className="font-mono font-semibold text-xs md:text-sm text-amber-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] tabular-nums px-1.5 py-0.5 rounded bg-black/60 border border-amber-500/30">
+        <span className="font-mono font-bold text-[11px] md:text-xs text-[#E5C99B] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] tabular-nums px-2 py-0.5 rounded-md bg-black/75 border border-[#C5A880]/40 shadow-md">
           ${amount.toLocaleString()}
         </span>
       )}
-    </div>
+    </motion.div>
   );
 };
