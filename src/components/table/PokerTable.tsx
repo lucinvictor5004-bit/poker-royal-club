@@ -15,6 +15,7 @@ export type TableFeltColor = 'emerald' | 'sapphire' | 'burgundy' | 'midnight';
 
 interface PokerTableProps {
   players: Player[];
+  currentPlayerId?: string;
   communityCards: Card[];
   totalPot: number;
   pots: PotSlice[];
@@ -32,6 +33,7 @@ interface PokerTableProps {
 
 export const PokerTable: React.FC<PokerTableProps> = ({
   players,
+  currentPlayerId,
   communityCards,
   totalPot,
   pots,
@@ -85,8 +87,9 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   const currentTheme = feltThemes[feltColor];
 
   // Radial positioning of players around oval
-  // We want the human player (usually at index 0 or first human) placed at bottom center
-  const humanIdx = players.findIndex((p) => p.isHuman);
+  // Anchor on currentPlayerId so each player sees themselves at bottom center
+  const myIdx = currentPlayerId ? players.findIndex((p) => p.id === currentPlayerId) : -1;
+  const humanIdx = myIdx !== -1 ? myIdx : players.findIndex((p) => p.isHuman);
   const anchorIdx = humanIdx !== -1 ? humanIdx : 0;
   const numPlayers = players.length;
 
@@ -220,6 +223,8 @@ export const PokerTable: React.FC<PokerTableProps> = ({
               const isSB = idx === sbIdx;
               const isBB = idx === bbIdx;
               const isWinner = winnerPlayerIds.includes(player.id);
+              const isMe = currentPlayerId ? player.id === currentPlayerId : idx === anchorIdx;
+              const isShowdown = winnerPlayerIds.length > 0 && !player.folded;
 
               return (
                 <div
@@ -234,8 +239,10 @@ export const PokerTable: React.FC<PokerTableProps> = ({
                     isSB={isSB}
                     isBB={isBB}
                     isWinner={isWinner}
+                    isCurrentPlayer={isMe}
+                    showHoleCards={isMe || isShowdown}
                     backStyle={backStyle}
-                    cardSize={player.isHuman ? 'md' : 'sm'}
+                    cardSize={isMe ? 'md' : 'sm'}
                     onRemoveBot={onRemoveBot}
                   />
                 </div>

@@ -16,6 +16,8 @@ interface PlayerSeatProps {
   isSB: boolean;
   isBB: boolean;
   isWinner: boolean;
+  isCurrentPlayer?: boolean;
+  showHoleCards?: boolean;
   backStyle?: CardBackStyle;
   cardSize?: 'sm' | 'md';
   onRemoveBot?: (botId: string) => void;
@@ -28,13 +30,16 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
   isSB,
   isBB,
   isWinner,
+  isCurrentPlayer = false,
+  showHoleCards,
   backStyle = 'classic-royal',
   cardSize = 'sm',
   onRemoveBot,
 }) => {
-  const isHuman = player.isHuman;
+  const isHuman = isCurrentPlayer || player.isHuman;
   const isFolded = player.folded;
   const isAllIn = player.isAllIn;
+  const shouldShowCards = showHoleCards !== undefined ? showHoleCards : player.showCards;
 
   // Avatar gradient styles based on avatarSeed
   const avatarGradients = [
@@ -49,7 +54,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
     'from-violet-600 to-purple-800',
     'from-teal-500 to-emerald-900',
   ];
-  const avatarBg = avatarGradients[player.avatarSeed % avatarGradients.length];
+  const avatarBg = avatarGradients[(player.avatarSeed || 0) % avatarGradients.length];
 
   return (
     <div
@@ -65,7 +70,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
 
       {/* Hole Cards */}
       <div className="relative flex items-center justify-center -space-x-4 mb-1 z-10">
-        {player.holeCards.map((card, idx) => {
+        {(player.holeCards || []).map((card, idx) => {
           const rotation = idx === 0 ? '-rotate-6' : 'rotate-6';
           const isWinningCard = isWinner;
           return (
@@ -77,7 +82,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
             >
               <CardComponent
                 card={card}
-                faceDown={!player.showCards}
+                faceDown={!shouldShowCards}
                 isWinning={isWinningCard}
                 size={cardSize}
                 backStyle={backStyle}

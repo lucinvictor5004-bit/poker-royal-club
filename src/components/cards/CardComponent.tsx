@@ -45,7 +45,9 @@ export const CardComponent: React.FC<CardProps> = ({
     );
   }
 
-  const isRed = card.isRed;
+  const rawCard = card as Card | { suit: Card['suit']; rank: Card['rank'] };
+  const hydratedCard = rawCard instanceof Card ? rawCard : new Card(rawCard.suit, rawCard.rank);
+  const isRed = hydratedCard.isRed;
   const suitColor = isRed ? 'text-red-600' : 'text-slate-900';
   const glowStyle = isWinning
     ? 'ring-2 ring-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.8)] scale-105 z-10'
@@ -55,12 +57,12 @@ export const CardComponent: React.FC<CardProps> = ({
   return (
     <div
       className={`relative select-none bg-gradient-to-br from-stone-50 via-white to-stone-100 border border-stone-300/80 font-sans flex flex-col justify-between p-1 md:p-1.5 transition-all duration-300 transform-gpu ${sizeClasses} ${glowStyle} ${dimStyle} ${className}`}
-      data-testid={`card-${card.toString()}`}
+      data-testid={`card-${hydratedCard.toString()}`}
     >
       {/* Top Left Corner */}
       <div className={`flex flex-col items-center leading-none ${suitColor}`}>
-        <span className="font-bold tracking-tighter">{card.rankLabel}</span>
-        <span className="text-[10px] md:text-xs">{card.symbol}</span>
+        <span className="font-bold tracking-tighter">{hydratedCard.rankLabel}</span>
+        <span className="text-[10px] md:text-xs">{hydratedCard.symbol}</span>
       </div>
 
       {/* Center Art / Large Suit */}
@@ -70,16 +72,16 @@ export const CardComponent: React.FC<CardProps> = ({
             size === 'sm' ? 'text-xl' : size === 'md' ? 'text-3xl' : 'text-5xl'
           }`}
         >
-          {card.symbol}
+          {hydratedCard.symbol}
         </span>
       </div>
 
       {/* Court card insignia accent */}
-      {card.rank >= 11 && (
+      {hydratedCard.rank >= 11 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-5/6 h-5/6 border border-amber-500/20 rounded flex items-center justify-center">
             <span className={`font-serif font-black opacity-30 ${suitColor}`}>
-              {card.rankLabel}
+              {hydratedCard.rankLabel}
             </span>
           </div>
         </div>
@@ -87,8 +89,8 @@ export const CardComponent: React.FC<CardProps> = ({
 
       {/* Bottom Right Corner (inverted) */}
       <div className={`flex flex-col items-center leading-none rotate-180 self-end ${suitColor}`}>
-        <span className="font-bold tracking-tighter">{card.rankLabel}</span>
-        <span className="text-[10px] md:text-xs">{card.symbol}</span>
+        <span className="font-bold tracking-tighter">{hydratedCard.rankLabel}</span>
+        <span className="text-[10px] md:text-xs">{hydratedCard.symbol}</span>
       </div>
 
       {/* Subtle glossy sheen line */}

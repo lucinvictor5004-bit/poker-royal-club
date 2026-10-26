@@ -500,7 +500,9 @@ export class ThreeCardPokerEngine {
 
   applySnapshot(snap: MultiplayerThreeCardSnapshot | ThreeCardSnapshot): void {
     this.phase = snap.phase;
-    this.dealerCards = [...snap.dealerCards];
+    this.dealerCards = (snap.dealerCards || []).map((c: any) =>
+      c instanceof Card ? c : new Card(c.suit, c.rank)
+    );
     this.dealerRevealed = snap.dealerRevealed;
     this.dealerHand = snap.dealerHand;
     this.dealerQualified = snap.dealerQualified;
@@ -509,7 +511,9 @@ export class ThreeCardPokerEngine {
     if (snap.players && snap.players.length > 0) {
       this.players = snap.players.map((p) => ({
         ...p,
-        cards: [...p.cards],
+        cards: (p.cards || []).map((c: any) =>
+          c instanceof Card ? c : new Card(c.suit, c.rank)
+        ),
         hand: p.hand,
         payoutSummary: p.payoutSummary ? { ...p.payoutSummary } : null,
       }));

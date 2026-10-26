@@ -4,13 +4,12 @@
  */
 
 import React, { useEffect } from 'react';
-import { PlusCircle, KeyRound, Users, Settings as SettingsIcon, BookOpen, Trophy } from 'lucide-react';
+import { PlusCircle, KeyRound, Settings as SettingsIcon, BookOpen, Trophy } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects.ts';
 
 interface MainMenuProps {
   onCreateRoom: () => void;
   onJoinByCode: () => void;
-  onOpenFriends: () => void;
   onOpenRules: () => void;
   onOpenStats: () => void;
   onOpenSettings: () => void;
@@ -19,7 +18,6 @@ interface MainMenuProps {
 export const MainMenu: React.FC<MainMenuProps> = ({
   onCreateRoom,
   onJoinByCode,
-  onOpenFriends,
   onOpenRules,
   onOpenStats,
   onOpenSettings,
@@ -43,41 +41,27 @@ export const MainMenu: React.FC<MainMenuProps> = ({
       </div>
 
       {/* Top Bar / Clean Header */}
-      <header className="relative z-10 w-full max-w-5xl flex items-center justify-between py-3">
+      <header className="relative z-10 w-full max-w-5xl flex items-center justify-between py-2.5">
         <div className="flex items-center gap-2.5">
           <span className="text-[#C5A880] text-xl font-serif">♠</span>
-          <span className="font-serif font-black tracking-widest text-base md:text-lg text-stone-100 uppercase">
+          <span className="font-serif font-black tracking-widest text-sm sm:text-base md:text-lg text-stone-100 uppercase">
             Royal Club Poker
           </span>
         </div>
 
-        {/* Top actions: Friends, Join by code, Settings */}
-        <div className="flex items-center gap-1.5 md:gap-2">
+        {/* Top actions: Join by code, Settings */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => {
               sounds.playButtonClick();
               onJoinByCode();
             }}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#141518] hover:bg-[#1a1b22] text-stone-300 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer"
+            className="min-h-[40px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#141518] hover:bg-[#1a1b22] text-stone-200 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer"
             title="Войти по коду"
           >
             <KeyRound className="w-3.5 h-3.5 text-[#C5A880]" />
-            <span className="hidden sm:inline">Войти по коду</span>
-            <span className="sm:hidden">Код</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              sounds.playButtonClick();
-              onOpenFriends();
-            }}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#141518] hover:bg-[#1a1b22] text-stone-300 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer"
-            title="Друзья"
-          >
-            <Users className="w-3.5 h-3.5 text-[#C5A880]" />
-            <span>Друзья</span>
+            <span>Войти по коду</span>
           </button>
 
           <button
@@ -86,7 +70,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
               sounds.playButtonClick();
               onOpenSettings();
             }}
-            className="p-1.5 md:p-2 rounded-xl bg-[#141518] hover:bg-[#1a1b22] text-stone-400 hover:text-stone-200 border border-stone-800 transition-colors cursor-pointer"
+            className="min-h-[40px] min-w-[40px] flex items-center justify-center p-2 rounded-xl bg-[#141518] hover:bg-[#1a1b22] text-stone-400 hover:text-stone-200 border border-stone-800 transition-colors cursor-pointer"
             aria-label="Настройки"
             title="Настройки"
           >
@@ -96,7 +80,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
       </header>
 
       {/* Center Hero Lockup & Actions */}
-      <main className="relative z-10 flex flex-col items-center text-center max-w-xl mx-auto my-auto py-6">
+      <main className="relative z-10 flex flex-col items-center text-center max-w-xl mx-auto my-auto py-4">
         {/* Emblem Crest */}
         <div className="relative mb-5">
           <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border border-[#C5A880]/50 bg-gradient-to-b from-[#1c1d24] via-[#121316] to-[#0c0d0f] shadow-[0_4px_25px_rgba(0,0,0,0.8)] flex items-center justify-center">
@@ -112,12 +96,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({
           Royal Club Poker
         </h1>
 
-        <p className="mt-2 text-xs md:text-sm text-stone-400 max-w-md leading-relaxed font-sans">
-          Онлайн покер для реальных игроков без ботов. Техасский Холдем и Трёхкарточный покер с закрытыми лобби и входом по коду.
+        <p className="mt-2 text-xs md:text-sm text-stone-400 max-w-md leading-relaxed font-sans px-2">
+          Онлайн покер для реальных игроков без ботов. Техасский Холдем и Трёхкарточный покер с мгновенным входом в комнату по коду.
         </p>
 
         {/* Main Action Buttons */}
-        <div className="mt-7 w-full max-w-xs space-y-2.5">
+        <div className="mt-7 w-full max-w-xs space-y-2.5 px-2 sm:px-0">
           {/* Create Room Primary CTA */}
           <button
             type="button"
@@ -126,47 +110,34 @@ export const MainMenu: React.FC<MainMenuProps> = ({
               onCreateRoom();
             }}
             data-start="true"
-            className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm md:text-base text-stone-950 bg-gradient-to-r from-[#D4AF37] to-[#C5A880] hover:from-[#e0be48] hover:to-[#d1b58d] shadow-[0_4px_20px_rgba(197,168,128,0.25)] transform hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2.5"
+            className="min-h-[48px] w-full py-3.5 px-6 rounded-2xl font-bold text-sm md:text-base text-stone-950 bg-gradient-to-r from-[#D4AF37] to-[#C5A880] hover:from-[#e0be48] hover:to-[#d1b58d] shadow-[0_4px_20px_rgba(197,168,128,0.25)] transform hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2.5"
           >
             <PlusCircle className="w-5 h-5 fill-stone-950" />
             <span>Создать комнату</span>
           </button>
 
-          {/* Dedicated Separate Button: Join by Code */}
+          {/* Dedicated Button: Join by Code */}
           <button
             type="button"
             onClick={() => {
               sounds.playButtonClick();
               onJoinByCode();
             }}
-            className="w-full py-3 px-6 rounded-2xl font-semibold text-xs md:text-sm text-stone-200 bg-[#141518] hover:bg-[#1a1b22] border border-stone-800 hover:border-[#C5A880]/50 transition-all cursor-pointer flex items-center justify-center gap-2.5"
+            className="min-h-[48px] w-full py-3.5 px-6 rounded-2xl font-semibold text-sm text-stone-100 bg-[#141518] hover:bg-[#1a1b22] border border-stone-800 hover:border-[#C5A880]/50 transition-all cursor-pointer flex items-center justify-center gap-2.5"
           >
             <KeyRound className="w-4 h-4 text-[#C5A880]" />
             <span>Войти по коду</span>
           </button>
 
-          {/* Dedicated Separate Button: Friends List */}
-          <button
-            type="button"
-            onClick={() => {
-              sounds.playButtonClick();
-              onOpenFriends();
-            }}
-            className="w-full py-3 px-6 rounded-2xl font-semibold text-xs md:text-sm text-stone-300 bg-[#141518] hover:bg-[#1a1b22] border border-stone-800 hover:border-stone-700 transition-all cursor-pointer flex items-center justify-center gap-2.5"
-          >
-            <Users className="w-4 h-4 text-stone-400" />
-            <span>Список друзей</span>
-          </button>
-
           {/* Secondary Utilities: Rules & Stats */}
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="grid grid-cols-2 gap-2 pt-1.5">
             <button
               type="button"
               onClick={() => {
                 sounds.playButtonClick();
                 onOpenRules();
               }}
-              className="py-2.5 px-3 rounded-xl font-medium text-xs text-stone-400 hover:text-stone-200 bg-[#121316] hover:bg-[#18191f] border border-stone-800/80 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="min-h-[42px] py-2.5 px-3 rounded-xl font-medium text-xs text-stone-400 hover:text-stone-200 bg-[#121316] hover:bg-[#18191f] border border-stone-800/80 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
             >
               <BookOpen className="w-3.5 h-3.5 text-[#C5A880]" />
               <span>Правила</span>
@@ -178,7 +149,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
                 sounds.playButtonClick();
                 onOpenStats();
               }}
-              className="py-2.5 px-3 rounded-xl font-medium text-xs text-stone-400 hover:text-stone-200 bg-[#121316] hover:bg-[#18191f] border border-stone-800/80 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="min-h-[42px] py-2.5 px-3 rounded-xl font-medium text-xs text-stone-400 hover:text-stone-200 bg-[#121316] hover:bg-[#18191f] border border-stone-800/80 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
             >
               <Trophy className="w-3.5 h-3.5 text-[#C5A880]" />
               <span>Статистика</span>
@@ -188,8 +159,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({
       </main>
 
       {/* Clean Footer */}
-      <footer className="relative z-10 w-full max-w-xl text-center py-3 text-xs text-stone-400">
-        <span>Создайте лобби или введите код для совместной онлайн игры</span>
+      <footer className="relative z-10 w-full max-w-xl text-center py-2.5 text-xs text-stone-400">
+        <span>Создайте комнату и отправьте 4-значный код лобби друзьям</span>
       </footer>
     </div>
   );

@@ -16,7 +16,6 @@ import { MainMenu } from './components/menu/MainMenu.tsx';
 import { LobbyRoom } from './components/lobby/LobbyRoom.tsx';
 import { CreateRoomModal } from './components/modals/CreateRoomModal.tsx';
 import { JoinByCodeModal } from './components/modals/JoinByCodeModal.tsx';
-import { FriendsListModal } from './components/modals/FriendsListModal.tsx';
 import { RulesModal } from './components/modals/RulesModal.tsx';
 import {
   StatsModal,
@@ -41,7 +40,6 @@ import {
   BookOpen,
   Settings as SettingsIcon,
   Home,
-  Users,
   KeyRound,
   Copy,
   Check,
@@ -50,7 +48,7 @@ import {
 export default function App() {
   const [view, setView] = useState<'menu' | 'lobby' | 'game'>('menu');
 
-  // Supabase Online Room state
+  // Online Room state
   const [activeRoom, setActiveRoom] = useState<RoomRecord | null>(null);
   const [roomPlayers, setRoomPlayers] = useState<RoomPlayerRecord[]>([]);
   const [currentPlayerId, setCurrentPlayerId] = useState<string>(() => {
@@ -64,7 +62,6 @@ export default function App() {
   // Modals state
   const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
   const [isJoinCodeOpen, setIsJoinCodeOpen] = useState(false);
-  const [isFriendsOpen, setIsFriendsOpen] = useState(false);
   const [isRulesOpen, setIsRulesOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -106,85 +103,12 @@ export default function App() {
     }
   }, [currentPlayerId]);
 
-  // Subscribe to real-time events for active room
-  useEffect(() => {
-    if (!activeRoom) return;
-
-    const unsubscribe = supabasePoker.subscribe(activeRoom.code, (event: any) => {
-      if (!event) return;
-
-      if (event.type === 'PLAYER_JOINED' || event.type === 'PLAYERS_UPDATED') {
-        if (event.payload?.players) {
-          setRoomPlayers(event.payload.players);
-          if (threeCardEngineRef.current && activeRoom.mode === 'three_card') {
-            threeCardEngineRef.current.syncRoomPlayers(event.payload.players);
-            setThreeCardSnapshot(threeCardEngineRef.current.getSnapshot());
-          }
-        }
-      } else if (event.type === 'GAME_STARTED') {
-        const updatedRoom = event.payload?.room || activeRoom;
-        setActiveRoom({ ...updatedRoom, status: 'in_game' });
-        launchGameForMode(updatedRoom);
-      } else if (event.type === 'PLAYER_LEFT') {
-        if (event.payload?.players) {
-          setRoomPlayers(event.payload.players);
-          if (threeCardEngineRef.current && activeRoom.mode === 'three_card') {
-            threeCardEngineRef.current.syncRoomPlayers(event.payload.players);
-            setThreeCardSnapshot(threeCardEngineRef.current.getSnapshot());
-          }
-        }
-      } else if (event.type === 'THREE_CARD_SYNC_STATE') {
-        if (event.payload?.snapshot && threeCardEngineRef.current) {
-          threeCardEngineRef.current.applySnapshot(event.payload.snapshot);
-          setThreeCardSnapshot(threeCardEngineRef.current.getSnapshot());
-        }
-      } else if (event.type === 'THREE_CARD_SET_BET') {
-        const isHost = activeRoom.hostId === currentPlayerId;
-        if (isHost && threeCardEngineRef.current) {
-          threeCardEngineRef.current.setBets(event.payload.ante, event.payload.pairPlus, event.payload.playerId);
-          const snap = threeCardEngineRef.current.getSnapshot();
-          setThreeCardSnapshot(snap);
-          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
-        }
-      } else if (event.type === 'THREE_CARD_ACTION') {
-        const isHost = activeRoom.hostId === currentPlayerId;
-        if (isHost && threeCardEngineRef.current) {
-          threeCardEngineRef.current.playAction(event.payload.action, event.payload.playerId);
-          const snap = threeCardEngineRef.current.getSnapshot();
-          setThreeCardSnapshot(snap);
-          snap.players.forEach((p) => {
-            supabasePoker.updatePlayerChips(activeRoom.code, p.id, p.chips);
-          });
-          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
-        }
-      } else if (event.type === 'THREE_CARD_DEAL') {
-        const isHost = activeRoom.hostId === currentPlayerId;
-        if (isHost && threeCardEngineRef.current) {
-          threeCardEngineRef.current.deal();
-          const snap = threeCardEngineRef.current.getSnapshot();
-          setThreeCardSnapshot(snap);
-          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
-        }
-      } else if (event.type === 'THREE_CARD_NEW_ROUND') {
-        const isHost = activeRoom.hostId === currentPlayerId;
-        if (isHost && threeCardEngineRef.current) {
-          threeCardEngineRef.current.newRound();
-          const snap = threeCardEngineRef.current.getSnapshot();
-          setThreeCardSnapshot(snap);
-          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
-        }
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [activeRoom?.code, activeRoom?.hostId, currentPlayerId]);
-
   // Initialize or launch game based on room mode
   const launchGameForMode = useCallback(
-    (room: RoomRecord) => {
-      const playersList = supabasePoker.getRoomPlayers(room.code);
+    (room: RoomRecord, explicitPlayers?: RoomPlayerRecord[]) => {
+      const playersList = explicitPlayers && explicitPlayers.length > 0
+        ? explicitPlayers
+        : supabasePoker.getRoomPlayers(room.code);
       const effectivePlayers = playersList.length > 0 ? playersList : roomPlayers;
       const isHost = room.hostId === currentPlayerId;
 
@@ -221,12 +145,11 @@ export default function App() {
           });
         });
 
-        // If host started solo, ensure at least 2 participant seats are prepared for play
         if (players.length < 2) {
           players.push(
             new Player({
               id: 'player_seat_2',
-              name: 'Ожидание игрока...',
+              name: 'Игрок 2',
               isHuman: true,
               chips: room.startingChips,
               avatarSeed: 1,
@@ -241,14 +164,129 @@ export default function App() {
         });
 
         engineRef.current = engine;
-        engine.startNewHand();
-        setSnapshot(engine.getSnapshot());
+        if (isHost) {
+          engine.startNewHand();
+          const snap = engine.getSnapshot();
+          setSnapshot(snap);
+          supabasePoker.broadcastGameEvent(room.code, 'TEXAS_SYNC_STATE', { snapshot: snap });
+        } else {
+          setSnapshot(engine.getSnapshot());
+        }
         setView('game');
         setIsVictoryAnim(false);
       }
     },
     [roomPlayers, currentPlayerId]
   );
+
+  // Subscribe to real-time events for active room
+  useEffect(() => {
+    if (!activeRoom) return;
+
+    const unsubscribe = supabasePoker.subscribe(activeRoom.code, (event: any) => {
+      if (!event) return;
+      const isHost = activeRoom.hostId === currentPlayerId;
+
+      if (event.type === 'PLAYER_JOINED' || event.type === 'PLAYERS_UPDATED') {
+        if (event.payload?.players) {
+          setRoomPlayers(event.payload.players);
+          if (threeCardEngineRef.current && activeRoom.mode === 'three_card') {
+            threeCardEngineRef.current.syncRoomPlayers(event.payload.players);
+            const snap = threeCardEngineRef.current.getSnapshot();
+            setThreeCardSnapshot(snap);
+            if (isHost) {
+              supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+            }
+          }
+        }
+      } else if (event.type === 'GAME_STARTED') {
+        const updatedRoom = event.payload?.room || activeRoom;
+        const playersFromEvent = event.payload?.players;
+        if (playersFromEvent) {
+          setRoomPlayers(playersFromEvent);
+        }
+        setActiveRoom({ ...updatedRoom, status: 'in_game' });
+        launchGameForMode(updatedRoom, playersFromEvent);
+      } else if (event.type === 'PLAYER_LEFT') {
+        if (event.payload?.players) {
+          setRoomPlayers(event.payload.players);
+          if (threeCardEngineRef.current && activeRoom.mode === 'three_card') {
+            threeCardEngineRef.current.syncRoomPlayers(event.payload.players);
+            setThreeCardSnapshot(threeCardEngineRef.current.getSnapshot());
+          }
+        }
+      } else if (event.type === 'THREE_CARD_SYNC_STATE') {
+        if (event.payload?.snapshot && threeCardEngineRef.current) {
+          threeCardEngineRef.current.applySnapshot(event.payload.snapshot);
+          setThreeCardSnapshot(threeCardEngineRef.current.getSnapshot());
+        }
+      } else if (event.type === 'THREE_CARD_SET_BET') {
+        if (isHost && threeCardEngineRef.current) {
+          threeCardEngineRef.current.setBets(event.payload.ante, event.payload.pairPlus, event.payload.playerId);
+          const snap = threeCardEngineRef.current.getSnapshot();
+          setThreeCardSnapshot(snap);
+          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+        }
+      } else if (event.type === 'THREE_CARD_ACTION') {
+        if (isHost && threeCardEngineRef.current) {
+          threeCardEngineRef.current.playAction(event.payload.action, event.payload.playerId);
+          const snap = threeCardEngineRef.current.getSnapshot();
+          setThreeCardSnapshot(snap);
+          snap.players.forEach((p) => {
+            supabasePoker.updatePlayerChips(activeRoom.code, p.id, p.chips);
+          });
+          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+        }
+      } else if (event.type === 'THREE_CARD_DEAL') {
+        if (isHost && threeCardEngineRef.current) {
+          threeCardEngineRef.current.deal();
+          const snap = threeCardEngineRef.current.getSnapshot();
+          setThreeCardSnapshot(snap);
+          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+        }
+      } else if (event.type === 'THREE_CARD_NEW_ROUND') {
+        if (isHost && threeCardEngineRef.current) {
+          threeCardEngineRef.current.newRound();
+          const snap = threeCardEngineRef.current.getSnapshot();
+          setThreeCardSnapshot(snap);
+          supabasePoker.broadcastGameEvent(activeRoom.code, 'THREE_CARD_SYNC_STATE', { snapshot: snap });
+        }
+      } else if (event.type === 'TEXAS_SYNC_STATE') {
+        if (event.payload?.snapshot) {
+          if (engineRef.current) {
+            engineRef.current.applySnapshot(event.payload.snapshot);
+            setSnapshot(engineRef.current.getSnapshot());
+          } else {
+            setSnapshot(PokerEngine.hydrateSnapshot(event.payload.snapshot));
+          }
+        }
+      } else if (event.type === 'TEXAS_ACTION') {
+        if (isHost && engineRef.current) {
+          const { playerId, action, amount } = event.payload;
+          const ok = engineRef.current.executeAction(playerId, action, amount);
+          if (ok) {
+            const snap = engineRef.current.getSnapshot();
+            setSnapshot(snap);
+            snap.players.forEach((p) => {
+              supabasePoker.updatePlayerChips(activeRoom.code, p.id, p.chips);
+            });
+            supabasePoker.broadcastGameEvent(activeRoom.code, 'TEXAS_SYNC_STATE', { snapshot: snap });
+          }
+        }
+      } else if (event.type === 'TEXAS_NEW_HAND') {
+        if (isHost && engineRef.current) {
+          engineRef.current.startNewHand();
+          const snap = engineRef.current.getSnapshot();
+          setSnapshot(snap);
+          supabasePoker.broadcastGameEvent(activeRoom.code, 'TEXAS_SYNC_STATE', { snapshot: snap });
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [activeRoom?.code, activeRoom?.hostId, activeRoom?.mode, currentPlayerId, launchGameForMode]);
 
   // Host creates room
   const handleCreateRoom = async (params: {
@@ -279,10 +317,11 @@ export default function App() {
 
     setCurrentPlayerId(res.player.id);
     setActiveRoom(res.room);
-    setRoomPlayers(supabasePoker.getRoomPlayers(res.room.code));
+    const updatedPlayers = supabasePoker.getRoomPlayers(res.room.code);
+    setRoomPlayers(updatedPlayers);
 
     if (res.room.status === 'in_game') {
-      launchGameForMode(res.room);
+      launchGameForMode(res.room, updatedPlayers);
     } else {
       setView('lobby');
     }
@@ -330,11 +369,19 @@ export default function App() {
 
   // Next Hand in Texas Hold'em
   const handleNextHand = useCallback(() => {
-    if (!engineRef.current) return;
     setIsVictoryAnim(false);
-    engineRef.current.startNewHand();
-    setSnapshot(engineRef.current.getSnapshot());
-  }, []);
+    const isHost = activeRoom?.hostId === currentPlayerId || !activeRoom;
+    if (isHost && engineRef.current) {
+      engineRef.current.startNewHand();
+      const snap = engineRef.current.getSnapshot();
+      setSnapshot(snap);
+      if (activeRoom) {
+        supabasePoker.broadcastGameEvent(activeRoom.code, 'TEXAS_SYNC_STATE', { snapshot: snap });
+      }
+    } else if (activeRoom) {
+      supabasePoker.broadcastGameEvent(activeRoom.code, 'TEXAS_NEW_HAND', {});
+    }
+  }, [activeRoom, currentPlayerId]);
 
   // Texas Hold'em Hand Ended Statistics recording
   useEffect(() => {
@@ -380,20 +427,35 @@ export default function App() {
 
   // Texas Hold'em Player Action handler
   const handleHumanAction = (action: PlayerActionType, amount: number = 0) => {
-    if (!engineRef.current || !snapshot) return;
+    if (!snapshot) return;
 
     const activePlayer = snapshot.players[snapshot.activePlayerIdx];
     if (!activePlayer) return;
 
-    const success = engineRef.current.executeAction(activePlayer.id, action, amount);
-    if (success) {
-      const nextSnap = engineRef.current.getSnapshot();
-      setSnapshot(nextSnap);
+    if (action === 'check') sounds.playCheckKnock();
+    else if (action === 'fold') sounds.playCardSlide();
+    else if (action === 'all-in') sounds.playAllInSound();
+    else sounds.playChipsToss();
 
-      if (action === 'check') sounds.playCheckKnock();
-      else if (action === 'fold') sounds.playCardSlide();
-      else if (action === 'all-in') sounds.playAllInSound();
-      else sounds.playChipsToss();
+    const isHost = activeRoom?.hostId === currentPlayerId || !activeRoom;
+    if (isHost && engineRef.current) {
+      const success = engineRef.current.executeAction(activePlayer.id, action, amount);
+      if (success) {
+        const nextSnap = engineRef.current.getSnapshot();
+        setSnapshot(nextSnap);
+        if (activeRoom) {
+          nextSnap.players.forEach((p) => {
+            supabasePoker.updatePlayerChips(activeRoom.code, p.id, p.chips);
+          });
+          supabasePoker.broadcastGameEvent(activeRoom.code, 'TEXAS_SYNC_STATE', { snapshot: nextSnap });
+        }
+      }
+    } else if (activeRoom) {
+      supabasePoker.broadcastGameEvent(activeRoom.code, 'TEXAS_ACTION', {
+        playerId: activePlayer.id,
+        action,
+        amount,
+      });
     }
   };
 
@@ -511,11 +573,13 @@ export default function App() {
 
   // Find active player for Texas Hold'em
   const activePlayer = snapshot?.players[snapshot.activePlayerIdx] || null;
+  const realHumanCount = snapshot?.players.filter((p) => p.id !== 'player_seat_2').length || 0;
   const isMyTurn = Boolean(
     snapshot &&
-    snapshot.phase !== 'hand_ended' &&
-    snapshot.activePlayerIdx >= 0 &&
-    (activePlayer?.id === currentPlayerId || snapshot.players.length === 1 || !activePlayer)
+      snapshot.phase !== 'hand_ended' &&
+      snapshot.activePlayerIdx >= 0 &&
+      (activePlayer?.id === currentPlayerId ||
+        (realHumanCount <= 1 && activePlayer?.id === 'player_seat_2'))
   );
 
   return (
@@ -528,7 +592,6 @@ export default function App() {
         <MainMenu
           onCreateRoom={() => setIsCreateRoomOpen(true)}
           onJoinByCode={() => setIsJoinCodeOpen(true)}
-          onOpenFriends={() => setIsFriendsOpen(true)}
           onOpenRules={() => setIsRulesOpen(true)}
           onOpenStats={() => setIsStatsOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
@@ -544,35 +607,34 @@ export default function App() {
           onStartGame={handleHostStartGame}
           onToggleReady={handleToggleReady}
           onLeaveLobby={handleLeaveLobby}
-          onOpenFriends={() => setIsFriendsOpen(true)}
         />
       )}
 
       {/* VIEW: IN-GAME */}
       {view === 'game' && (
-        <div className="relative z-20 flex-1 h-full max-h-full flex flex-col justify-between p-2 md:p-3 max-w-7xl mx-auto w-full overflow-hidden">
+        <div className="relative z-20 flex-1 h-full max-h-full flex flex-col justify-between p-1.5 sm:p-2 md:p-3 max-w-7xl mx-auto w-full overflow-hidden">
           {/* Top In-Game Bar with Room Code prominently on top-right */}
-          <header className="shrink-0 flex items-center justify-between gap-3 py-1.5 px-3 rounded-2xl bg-[#141518]/90 border border-stone-800/80 backdrop-blur-md">
+          <header className="shrink-0 flex items-center justify-between gap-1.5 sm:gap-3 py-1.5 px-2.5 sm:px-3 rounded-2xl bg-[#141518]/90 border border-stone-800/80 backdrop-blur-md">
             {/* Left Zone: Return to menu & Mode name */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
               <button
                 type="button"
                 onClick={() => {
                   sounds.playButtonClick();
                   setView('menu');
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-300 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer"
+                className="min-h-[36px] flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-300 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer shrink-0"
               >
                 <Home className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">В меню</span>
               </button>
-              <span className="font-serif font-black tracking-wider text-stone-100 text-xs md:text-sm uppercase whitespace-nowrap">
-                {activeRoom?.mode === 'three_card' ? 'Трёхкарточный покер' : "Texas Hold'em"}
+              <span className="font-serif font-black tracking-wider text-stone-100 text-[11px] sm:text-xs md:text-sm uppercase truncate">
+                {activeRoom?.mode === 'three_card' ? '3-Card Poker' : "Texas Hold'em"}
               </span>
             </div>
 
             {/* Center Zone: Table stakes / info */}
-            <div className="flex items-center gap-2 text-xs text-stone-400 font-mono">
+            <div className="hidden md:flex items-center gap-2 text-xs text-stone-400 font-mono">
               {activeRoom?.mode === 'three_card' ? (
                 <>
                   <span className="text-[#C5A880] font-bold">VIP Стол vs Дилер</span>
@@ -592,52 +654,39 @@ export default function App() {
               )}
             </div>
 
-            {/* Right Zone: Room Code prominent + 2 separate buttons (Join by Code & Friends) + Mute/Settings */}
-            <div className="flex items-center gap-2">
+            {/* Right Zone: Room Code prominent + Enter Code + Mute/Settings */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               {/* Prominent Room Code Display */}
               {activeRoom && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#1a1b22] border border-[#C5A880]/40">
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  className="min-h-[36px] flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#1a1b22] hover:bg-[#22242d] border border-[#C5A880]/40 transition-colors cursor-pointer"
+                  title="Нажмите, чтобы скопировать код комнаты"
+                >
                   <span className="text-[10px] uppercase font-bold text-stone-400 hidden lg:inline">
                     Код:
                   </span>
                   <span className="font-mono text-xs md:text-sm font-bold text-[#C5A880]">
                     {activeRoom.code}
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleCopyCode}
-                    className="p-1 rounded text-stone-400 hover:text-stone-100 transition-colors cursor-pointer"
-                    title="Скопировать код лобби"
-                  >
-                    {codeCopied ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                </div>
+                  {codeCopied ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-stone-400" />
+                  )}
+                </button>
               )}
 
-              {/* Distinct Button 1: Enter Code */}
+              {/* Enter Code Button */}
               <button
                 type="button"
                 onClick={() => setIsJoinCodeOpen(true)}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-300 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer"
+                className="min-h-[36px] flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-300 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer"
                 title="Войти по коду"
               >
                 <KeyRound className="w-3.5 h-3.5 text-[#C5A880]" />
                 <span className="hidden sm:inline">Код</span>
-              </button>
-
-              {/* Distinct Button 2: Friends */}
-              <button
-                type="button"
-                onClick={() => setIsFriendsOpen(true)}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-300 hover:text-[#C5A880] border border-stone-800 text-xs font-semibold transition-colors cursor-pointer"
-                title="Список друзей"
-              >
-                <Users className="w-3.5 h-3.5 text-[#C5A880]" />
-                <span className="hidden sm:inline">Друзья</span>
               </button>
 
               {/* Quick Mute Toggle */}
@@ -648,7 +697,7 @@ export default function App() {
                   sounds.setMuted(newMuted);
                   handleUpdateSettings({ isMuted: newMuted });
                 }}
-                className="p-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-400 hover:text-[#C5A880] border border-stone-800 transition-colors cursor-pointer"
+                className="min-h-[36px] min-w-[36px] flex items-center justify-center p-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-400 hover:text-[#C5A880] border border-stone-800 transition-colors cursor-pointer"
                 title={settings.isMuted ? 'Включить звук' : 'Без звука'}
               >
                 {settings.isMuted ? (
@@ -670,7 +719,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsRulesOpen(true)}
-                className="p-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-400 hover:text-[#C5A880] border border-stone-800 transition-colors cursor-pointer"
+                className="min-h-[36px] min-w-[36px] flex items-center justify-center p-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-400 hover:text-[#C5A880] border border-stone-800 transition-colors cursor-pointer"
                 title="Правила игры"
               >
                 <BookOpen className="w-4 h-4" />
@@ -680,7 +729,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen(true)}
-                className="p-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-400 hover:text-[#C5A880] border border-stone-800 transition-colors cursor-pointer"
+                className="min-h-[36px] min-w-[36px] flex items-center justify-center p-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-400 hover:text-[#C5A880] border border-stone-800 transition-colors cursor-pointer"
                 title="Настройки"
               >
                 <SettingsIcon className="w-4 h-4" />
@@ -712,6 +761,7 @@ export default function App() {
                 {snapshot && (
                   <PokerTable
                     players={snapshot.players}
+                    currentPlayerId={currentPlayerId}
                     communityCards={snapshot.communityCards}
                     totalPot={snapshot.totalPot}
                     pots={snapshot.pots}
@@ -728,7 +778,7 @@ export default function App() {
               </main>
 
               {/* Bottom Texas Hold'em Action Area */}
-              <footer className="relative shrink-0 flex items-center justify-center pt-1 pb-2 z-30 w-full max-w-4xl mx-auto px-2">
+              <footer className="relative shrink-0 flex items-center justify-center pt-1 pb-1.5 z-30 w-full max-w-4xl mx-auto px-1.5 sm:px-2">
                 <div className="w-full z-30">
                   {snapshot && (
                     <ControlPanel
@@ -761,12 +811,6 @@ export default function App() {
         isOpen={isJoinCodeOpen}
         onClose={() => setIsJoinCodeOpen(false)}
         onJoinByCode={handleJoinByCode}
-      />
-
-      <FriendsListModal
-        isOpen={isFriendsOpen}
-        onClose={() => setIsFriendsOpen(false)}
-        currentRoomCode={activeRoom?.code}
       />
 
       <RulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />

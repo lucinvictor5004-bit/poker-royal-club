@@ -603,6 +603,60 @@ export class PokerEngine {
     };
   }
 
+  static hydrateSnapshot(snap: TableSnapshot): TableSnapshot {
+    return {
+      ...snap,
+      communityCards: (snap.communityCards || []).map((c: any) =>
+        c instanceof Card ? c : new Card(c.suit, c.rank)
+      ),
+      players: (snap.players || []).map((rawP: any) => {
+        if (rawP instanceof Player) return rawP.clone();
+        const p = new Player({
+          id: rawP.id,
+          name: rawP.name,
+          isHuman: rawP.isHuman,
+          chips: rawP.chips,
+          avatarSeed: rawP.avatarSeed,
+          difficulty: rawP.difficulty,
+        });
+        p.holeCards = (rawP.holeCards || []).map((c: any) =>
+          c instanceof Card ? c : new Card(c.suit, c.rank)
+        );
+        p.currentBet = rawP.currentBet ?? 0;
+        p.totalHandBet = rawP.totalHandBet ?? 0;
+        p.folded = Boolean(rawP.folded);
+        p.isAllIn = Boolean(rawP.isAllIn);
+        p.isSittingOut = Boolean(rawP.isSittingOut);
+        p.role = rawP.role || 'none';
+        p.lastAction = rawP.lastAction ?? null;
+        p.lastActionAmount = rawP.lastActionAmount ?? 0;
+        p.showCards = Boolean(rawP.showCards);
+        p.hasActedThisStreet = Boolean(rawP.hasActedThisStreet);
+        return p;
+      }),
+    };
+  }
+
+  applySnapshot(rawSnap: TableSnapshot): TableSnapshot {
+    const snap = PokerEngine.hydrateSnapshot(rawSnap);
+    this.phase = snap.phase;
+    this.handNumber = snap.handNumber;
+    this.smallBlind = snap.smallBlind;
+    this.bigBlind = snap.bigBlind;
+    this.dealerIdx = snap.dealerIdx;
+    this.sbIdx = snap.sbIdx;
+    this.bbIdx = snap.bbIdx;
+    this.activePlayerIdx = snap.activePlayerIdx;
+    this.highestBetThisStreet = snap.highestBet;
+    this.communityCards = snap.communityCards;
+    this.players = snap.players;
+    this.actionLog = snap.actionLog || [];
+    this.lastPayouts = snap.lastPayouts || [];
+    this.winnerPlayerIds = snap.winnerPlayerIds || [];
+    this.winnerDescriptions = snap.winnerDescriptions || [];
+    return snap;
+  }
+
   /**
    * Helper for Bot AI turn calculation
    */

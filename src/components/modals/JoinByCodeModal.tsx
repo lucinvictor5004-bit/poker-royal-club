@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { X, KeyRound, LogIn, AlertCircle } from 'lucide-react';
+import { normalizeRoomCode } from '../../services/supabase.ts';
 import { sounds } from '../../utils/soundEffects.ts';
 
 interface JoinByCodeModalProps {
@@ -31,9 +32,11 @@ export const JoinByCodeModal: React.FC<JoinByCodeModalProps> = ({
 
   if (!isOpen) return null;
 
+  const normalizedPreview = normalizeRoomCode(code);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formattedCode = code.trim().toUpperCase();
+    const formattedCode = normalizeRoomCode(code);
     if (!formattedCode) return;
 
     const trimmedName = playerName.trim() || 'Гость';
@@ -52,6 +55,7 @@ export const JoinByCodeModal: React.FC<JoinByCodeModalProps> = ({
 
     if (res.success) {
       sounds.playWinFanfare();
+      setCode('');
       onClose();
     } else {
       setError(res.error || 'Не удалось войти в комнату. Проверьте код.');
@@ -70,7 +74,7 @@ export const JoinByCodeModal: React.FC<JoinByCodeModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer"
+            className="min-h-[38px] min-w-[38px] flex items-center justify-center p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -79,36 +83,43 @@ export const JoinByCodeModal: React.FC<JoinByCodeModalProps> = ({
         {/* Content Form */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <p className="text-xs text-stone-400 leading-relaxed">
-            Введите 4-значный код лобби, сообщенный хостом комнаты (например, <span className="font-mono text-[#C5A880]">ROYAL-4821</span>).
+            Введите код комнаты целиком (<span className="font-mono text-[#C5A880]">ROYAL-4821</span>) или только 4 цифры (<span className="font-mono text-[#C5A880]">4821</span>), которые сообщил хост.
           </p>
 
           {error && (
-            <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-xs flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
-          <div className="space-y-1">
-            <label htmlFor="input-room-code" className="text-xs font-semibold text-stone-400">
-              Код комнаты:
-            </label>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label htmlFor="input-room-code" className="text-xs font-semibold text-stone-400">
+                Код комнаты:
+              </label>
+              {normalizedPreview && (
+                <span className="text-[11px] font-mono text-[#C5A880]">
+                  Будет выполнен вход в: <strong>{normalizedPreview}</strong>
+                </span>
+              )}
+            </div>
             <input
               id="input-room-code"
               type="text"
               required
               autoFocus
-              placeholder="Например: ROYAL-4821"
+              placeholder="ROYAL-4821 или 4821"
               value={code}
               onChange={(e) => {
                 setError(null);
                 setCode(e.target.value.toUpperCase());
               }}
-              className="w-full bg-[#18191f] border border-stone-800 rounded-xl px-3 py-2.5 text-sm font-mono text-[#C5A880] tracking-wider uppercase focus:outline-none focus:border-[#C5A880]"
+              className="w-full bg-[#18191f] border border-stone-800 rounded-xl px-3.5 py-3 text-base font-mono text-[#C5A880] tracking-wider uppercase focus:outline-none focus:border-[#C5A880]"
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <label htmlFor="input-player-name" className="text-xs font-semibold text-stone-400">
               Ваше имя за столом:
             </label>
@@ -119,7 +130,7 @@ export const JoinByCodeModal: React.FC<JoinByCodeModalProps> = ({
               placeholder="Введите никнейм"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
-              className="w-full bg-[#18191f] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200 focus:outline-none focus:border-[#C5A880]"
+              className="w-full bg-[#18191f] border border-stone-800 rounded-xl px-3.5 py-2.5 text-sm text-stone-200 focus:outline-none focus:border-[#C5A880]"
             />
           </div>
 
@@ -127,10 +138,10 @@ export const JoinByCodeModal: React.FC<JoinByCodeModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting || !code.trim()}
-              className="w-full py-3 rounded-xl font-bold text-xs md:text-sm bg-[#C5A880] hover:bg-[#d6bb96] text-stone-950 transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              className="min-h-[48px] w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-[#D4AF37] to-[#C5A880] hover:from-[#e0be48] hover:to-[#d1b58d] text-stone-950 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <LogIn className="w-4 h-4" />
-              <span>{isSubmitting ? 'Подключение...' : 'Войти в лобби'}</span>
+              <span>{isSubmitting ? 'Поиск комнаты и подключение...' : 'Войти в лобби'}</span>
             </button>
           </div>
         </form>
